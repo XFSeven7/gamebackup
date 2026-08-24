@@ -63,7 +63,7 @@ class Api:
     def add_folder(self, path: str, name: str) -> dict:
         p = Path(path)
         if not p.is_dir():
-            return {"ok": False, "error": "文件夹不存在"}
+            return {"ok": False, "error": "找不到这个文件夹"}
         item = add_folder(ROOT, p, name.strip() or p.name)
         return {"ok": True, "item": asdict(item)}
 
@@ -71,7 +71,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         it.name = name.strip() or it.name
         save(ROOT, cfg)
         return {"ok": True}
@@ -80,10 +80,10 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         repo = repo_dir(ROOT, it.id)
         if not (repo / ".git").exists():
-            return {"ok": False, "error": "仓库还没建好"}
+            return {"ok": False, "error": "这份存档还没备份过"}
         g = graph(repo, hide_auto=bool(hide_auto), current_line=it.current_line)
         g["ok"] = True
         g["item_name"] = it.name
@@ -93,7 +93,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         try:
             restore(ROOT, it, commit_id, fork=bool(fork))
             return {"ok": True}
@@ -104,8 +104,8 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
-        name = name.strip() or ("线-" + commit_id[:6])
+            return {"ok": False, "error": "没有找到这份存档"}
+        name = name.strip() or ("进度-" + commit_id[:6])
         try:
             create_line(repo_dir(ROOT, it.id), commit_id, name)
             return {"ok": True}
@@ -116,10 +116,10 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         name = name.strip()
         if not name:
-            return {"ok": False, "error": "标签不能为空"}
+            return {"ok": False, "error": "请起个名字"}
         try:
             add_tag(repo_dir(ROOT, it.id), commit_id, name)
             return {"ok": True}
@@ -130,7 +130,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         try:
             put_note(repo_dir(ROOT, it.id), commit_id, text)
             return {"ok": True}
@@ -141,10 +141,10 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         new = new.strip()
         if not new:
-            return {"ok": False, "error": "名字不能为空"}
+            return {"ok": False, "error": "请输入名字"}
         try:
             rename_line(repo_dir(ROOT, it.id), old, new)
             if it.current_line == old:
@@ -158,7 +158,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         try:
             delete_line(repo_dir(ROOT, it.id), name)
             return {"ok": True}
@@ -169,7 +169,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         it.paused = bool(paused)
         save(ROOT, cfg)
         return {"ok": True}
@@ -183,7 +183,7 @@ class Api:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
         if not it:
-            return {"ok": False, "error": "找不到这一项"}
+            return {"ok": False, "error": "没有找到这份存档"}
         return {"ok": True, **backup_once(ROOT, it)}
 
 
@@ -198,7 +198,7 @@ def main() -> None:
             webview.windows[0].show()
             webview.windows[0].restore()
         else:
-            webview.create_window("gamebackup", str(UI), js_api=api, width=1100, height=720)
+    webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
 
     def quit_app(icon, _item):
         scheduler.stop()
@@ -207,15 +207,15 @@ def main() -> None:
             w.destroy()
 
     menu = pystray.Menu(
-        pystray.MenuItem("打开", lambda _i, _j: show_window(), default=True),
-        pystray.MenuItem("暂停全部备份", lambda _i, _j: api.pause_all(True)),
-        pystray.MenuItem("继续备份", lambda _i, _j: api.pause_all(False)),
+        pystray.MenuItem("打开窗口", lambda _i, _j: show_window(), default=True),
+        pystray.MenuItem("暂停自动备份", lambda _i, _j: api.pause_all(True)),
+        pystray.MenuItem("继续自动备份", lambda _i, _j: api.pause_all(False)),
         pystray.MenuItem("退出", quit_app),
     )
-    icon = pystray.Icon("gamebackup", _icon_image(), "gamebackup", menu)
+    icon = pystray.Icon("gamebackup", _icon_image(), "存档备份", menu)
     threading.Thread(target=icon.run, daemon=True).start()
 
-    webview.create_window("gamebackup", str(UI), js_api=api, width=1100, height=720)
+    webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
     webview.start()
     scheduler.stop()
 

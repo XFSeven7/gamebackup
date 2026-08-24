@@ -46,10 +46,10 @@ class BackupTest(unittest.TestCase):
             self.assertEqual((live / "s.sav").read_bytes(), b"old")
             g = graph(repo, hide_auto=False, current_line=item.current_line)
             names = [ln["name"] for ln in g["lines"]]
-            self.assertTrue(any(n.startswith("恢复前-") for n in names))
-            # 恢复前线应仍能看到 new
+            self.assertTrue(any(n.startswith("换档前-") for n in names))
+            # 换档前那条进度应仍能看到 new
             from store import checkout_line
-            pre = next(n for n in names if n.startswith("恢复前-"))
+            pre = next(n for n in names if n.startswith("换档前-"))
             checkout_line(repo, pre)
             self.assertEqual((repo / "s.sav").read_bytes(), b"new")
 

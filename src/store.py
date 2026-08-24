@@ -104,7 +104,7 @@ def rename_line(path: Path, old: str, new: str) -> None:
 
 def delete_line(path: Path, name: str) -> None:
     if name == "main":
-        raise ValueError("不能删除主线")
+        raise ValueError("正在用的这条进度不能删")
     repo = Repo(_p(path))
     ref = b"refs/heads/" + name.encode("utf-8")
     if ref not in repo.refs:

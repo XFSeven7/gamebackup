@@ -2,46 +2,46 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>gamebackup</title>
+  <title>存档备份</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
-    <div class="brand">gamebackup</div>
-    <label class="toggle"><input type="checkbox" id="showAuto" /> 显示自动备份</label>
-    <button type="button" id="btnAdd">添加文件夹</button>
-    <button type="button" id="btnPauseAll">暂停全部</button>
+    <div class="brand">存档备份</div>
+    <label class="toggle"><input type="checkbox" id="showAuto" /> 显示每分钟的备份</label>
+    <button type="button" id="btnAdd">添加游戏存档</button>
+    <button type="button" id="btnPauseAll">暂停自动备份</button>
   </header>
   <main>
     <aside>
-      <h2>存档</h2>
+      <h2>我的游戏</h2>
       <ul id="itemList"></ul>
-      <h2>存档线</h2>
+      <h2>进度路线</h2>
       <ul id="lineList"></ul>
     </aside>
     <section id="graphPane">
       <div id="empty">
-        <p>选择一个存档文件夹，就会开始管理历史。</p>
-        <button type="button" id="btnAddBig">选择存档文件夹</button>
+        <p>选一个游戏存档所在的文件夹，之后会自动帮你记住每一版。</p>
+        <button type="button" id="btnAddBig">选择游戏存档</button>
       </div>
       <div id="graphWrap" hidden>
         <svg id="graph"></svg>
       </div>
     </section>
     <aside class="detail" id="detail">
-      <h2>这一版</h2>
-      <p id="detailEmpty">点图上的圆点查看。</p>
+      <h2>这一刻</h2>
+      <p id="detailEmpty">点图上的圆点，看看这一刻的存档。</p>
       <div id="detailBody" hidden>
         <p><b id="dTime"></b></p>
         <p id="dMsg"></p>
         <p id="dNote"></p>
         <p id="dTags"></p>
         <div class="btns">
-          <button type="button" id="btnRestore">恢复（另开一线）</button>
-          <button type="button" id="btnOverwrite">覆盖恢复</button>
-          <button type="button" id="btnNewLine">从这里开新线</button>
-          <button type="button" id="btnTag">打标签</button>
-          <button type="button" id="btnNote">改备注</button>
+          <button type="button" id="btnRestore">回到这一刻（先留着现在的进度）</button>
+          <button type="button" id="btnOverwrite">直接换成这一刻</button>
+          <button type="button" id="btnNewLine">从这一刻另存一条进度</button>
+          <button type="button" id="btnTag">给这一刻起名</button>
+          <button type="button" id="btnNote">写备注</button>
         </div>
       </div>
     </aside>

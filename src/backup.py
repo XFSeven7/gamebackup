@@ -74,7 +74,7 @@ def restore(root: Path, item: ManagedFolder, commit_id: str, fork: bool) -> None
         tip = g["current_id"]
         if tip:
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            create_line(repo, tip, f"恢复前-{stamp}")
+            create_line(repo, tip, f"换档前-{stamp}")
     reset_to(repo, commit_id)
     live = Path(fresh.path)
     mirror(repo, live)

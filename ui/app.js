@@ -20,13 +20,13 @@ async function refreshItems() {
   items.forEach((it) => {
     const li = document.createElement("li");
     li.className = "item" + (it.id === selectedId ? " active" : "") + (it.available ? "" : " missing");
-    li.innerHTML = `<div>${escapeHtml(it.name)}</div><div class="sub">${escapeHtml(it.available ? it.path_short : "路径不可用")}</div>`;
+    li.innerHTML = `<div>${escapeHtml(it.name)}</div><div class="sub">${escapeHtml(it.available ? it.path_short : "找不到这个文件夹了")}</div>`;
     li.onclick = () => selectItem(it.id);
     li.oncontextmenu = (e) => {
       e.preventDefault();
       showMenu(e.clientX, e.clientY, [
-        { label: "改名", run: () => renameItem(it.id, it.name) },
-        { label: it.paused ? "继续备份" : "暂停备份", run: () => api().pause_item(it.id, !it.paused).then(loadGraph) },
+        { label: "改名字", run: () => renameItem(it.id, it.name) },
+        { label: it.paused ? "继续自动备份" : "暂停自动备份", run: () => api().pause_item(it.id, !it.paused).then(loadGraph) },
       ]);
     };
     ul.appendChild(li);
@@ -83,8 +83,8 @@ function renderLines(g) {
     li.oncontextmenu = (e) => {
       e.preventDefault();
       showMenu(e.clientX, e.clientY, [
-        { label: "改名", run: () => renameLine(ln.name) },
-        { label: "删除线", run: () => delLine(ln.name) },
+        { label: "改名字", run: () => renameLine(ln.name) },
+        { label: "删掉这条进度", run: () => delLine(ln.name) },
       ]);
     };
     ul.appendChild(li);
@@ -149,7 +149,7 @@ function renderGraph(g) {
     const r = n.auto ? 5 : 7;
     const fill = isCur ? "#e6b325" : n.auto ? "#777" : "#3d8bfd";
     const remark = nodeRemark(n);
-    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 22}" fill="#e6b325" font-size="11">当前</text>` : "";
+    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 22}" fill="#e6b325" font-size="11">正在用</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
       ${curTxt}
@@ -171,11 +171,11 @@ function renderGraph(g) {
       renderGraph(g);
       renderDetail();
       showMenu(e.clientX, e.clientY, [
-        { label: "恢复（另开一线）", run: () => restore(true) },
-        { label: "覆盖恢复", run: () => restore(false) },
-        { label: "从这里开新线", run: newLine },
-        { label: "打标签", run: tagNode },
-        { label: "改备注", run: noteNode },
+        { label: "回到这一刻（先留着现在的进度）", run: () => restore(true) },
+        { label: "直接换成这一刻", run: () => restore(false) },
+        { label: "从这一刻另存一条进度", run: newLine },
+        { label: "给这一刻起名", run: tagNode },
+        { label: "写备注", run: noteNode },
       ]);
     });
   });
@@ -192,16 +192,16 @@ function renderDetail() {
   empty.hidden = true;
   body.hidden = false;
   $("dTime").textContent = formatTime(selectedNode.time);
-  $("dMsg").textContent = selectedNode.auto ? "自动备份" : selectedNode.message;
+  $("dMsg").textContent = selectedNode.auto ? "自动存档" : selectedNode.message;
   $("dNote").textContent = selectedNode.note ? "备注：" + selectedNode.note : "";
-  $("dTags").textContent = (selectedNode.tags || []).length ? "标签：" + selectedNode.tags.join("、") : "";
+  $("dTags").textContent = (selectedNode.tags || []).length ? "名称：" + selectedNode.tags.join("、") : "";
 }
 
 async function addFolder() {
   const path = await api().pick_folder();
   if (!path) return;
   const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
-  const name = prompt("给这份存档起个名字", base);
+  const name = prompt("给这个游戏起个名字，方便以后找", base);
   if (name === null) return;
   const r = await api().add_folder(path, name);
   if (!r.ok) return alert(r.error);
@@ -211,7 +211,7 @@ async function addFolder() {
 }
 
 async function renameItem(id, old) {
-  const name = prompt("名字", old);
+  const name = prompt("游戏叫什么名字？", old);
   if (!name) return;
   const r = await api().rename_item(id, name);
   if (!r.ok) return alert(r.error);
@@ -220,10 +220,10 @@ async function renameItem(id, old) {
 
 async function restore(fork) {
   if (!selectedId || !selectedNode) return;
-  const extra = "若开启了 Steam 云存档，恢复后云端可能再次覆盖。";
+  const extra = "如果开了 Steam 云存档，Steam 有可能又把存档改回去。";
   if (fork) {
-    if (!confirm("把当前进度另存成一条线，再恢复到这一版。\n" + extra)) return;
-  } else if (!confirm("覆盖当前存档，不另开一线。此操作更危险。\n" + extra)) return;
+    if (!confirm("先把你现在的进度另外存一份，再把游戏换成刚才点的那一版。\n" + extra)) return;
+  } else if (!confirm("直接把游戏换成这一版，现在的进度会没有。\n" + extra)) return;
   const r = await api().restore(selectedId, selectedNode.id, fork);
   if (!r.ok) return alert(r.error);
   await loadGraph();
@@ -231,7 +231,7 @@ async function restore(fork) {
 
 async function newLine() {
   if (!selectedId || !selectedNode) return;
-  const name = prompt("新线名称", "线");
+  const name = prompt("这条进度叫什么？", "新进度");
   if (!name) return;
   const r = await api().create_line(selectedId, selectedNode.id, name);
   if (!r.ok) return alert(r.error);
@@ -240,7 +240,7 @@ async function newLine() {
 
 async function tagNode() {
   if (!selectedId || !selectedNode) return;
-  const name = prompt("标签", "打 Boss 前");
+  const name = prompt("给这一刻起个名字，方便以后找", "打 Boss 前");
   if (!name) return;
   const r = await api().tag(selectedId, selectedNode.id, name);
   if (!r.ok) return alert(r.error);
@@ -249,7 +249,7 @@ async function tagNode() {
 
 async function noteNode() {
   if (!selectedId || !selectedNode) return;
-  const text = prompt("备注", selectedNode.note || "");
+  const text = prompt("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
   if (text === null) return;
   const r = await api().set_note(selectedId, selectedNode.id, text);
   if (!r.ok) return alert(r.error);
@@ -257,7 +257,7 @@ async function noteNode() {
 }
 
 async function renameLine(old) {
-  const name = prompt("存档线名称", old);
+  const name = prompt("这条进度叫什么？", old);
   if (!name) return;
   const r = await api().rename_line(selectedId, old, name);
   if (!r.ok) return alert(r.error);
@@ -265,7 +265,7 @@ async function renameLine(old) {
 }
 
 async function delLine(name) {
-  if (!confirm("删除这条存档线？游戏文件夹不会动。")) return;
+  if (!confirm("从图上删掉这条进度？游戏里的存档文件不会被删。")) return;
   const r = await api().delete_line(selectedId, name);
   if (!r.ok) return alert(r.error);
   await loadGraph();
@@ -329,7 +329,7 @@ let allPaused = false;
 $("btnPauseAll").onclick = async () => {
   allPaused = !allPaused;
   const r = await api().pause_all(allPaused);
-  $("btnPauseAll").textContent = r.paused ? "继续备份" : "暂停全部";
+  $("btnPauseAll").textContent = r.paused ? "继续自动备份" : "暂停自动备份";
 };
 $("btnRestore").onclick = () => restore(true);
 $("btnOverwrite").onclick = () => restore(false);
