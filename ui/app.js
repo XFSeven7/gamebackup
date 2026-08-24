@@ -118,10 +118,8 @@ function layout(g) {
     if (!kids.has(pid)) kids.set(pid, []);
     kids.get(pid).push(n);
   });
-  const spine = onCurrentLine(g);
-  const rank = (n) => (spine.has(n.id) ? 0 : 1);
   const sortNodes = (arr) => {
-    arr.sort((a, b) => rank(a) - rank(b) || b.time - a.time);
+    arr.sort((a, b) => b.time - a.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   };
   kids.forEach(sortNodes);
   const roots = nodes.filter((n) => !(n.parents || []).some((p) => visible.has(p)));
@@ -164,6 +162,24 @@ function layout(g) {
   const colVals = Object.values(colOf);
   const cols = colVals.length ? Math.max(...colVals) + 1 : 1;
   return { nodes, colOf, rowOf, cols };
+}
+
+function layoutKey(g) {
+  const nodes = (g.nodes || [])
+    .map((n) => `${n.id}:${(n.parents || []).join(",")}`)
+    .sort()
+    .join("|");
+  return nodes;
+}
+
+let layoutCache = { key: "", value: null };
+
+function getLayout(g) {
+  const k = layoutKey(g);
+  if (layoutCache.key === k && layoutCache.value) return layoutCache.value;
+  const value = layout(g);
+  layoutCache = { key: k, value };
+  return value;
 }
 
 function edgePath(x1, y1, x2, y2, curve) {
@@ -284,7 +300,7 @@ function bindCanvas() {
 }
 
 function renderGraph(g) {
-  const { nodes, colOf, rowOf, cols } = layout(g);
+  const { nodes, colOf, rowOf, cols } = getLayout(g);
   const current = onCurrentLine(g);
   const PAD_TOP = 44;
   const PAD_BOTTOM = 32;
