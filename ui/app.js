@@ -7,6 +7,7 @@ let selectedNode = null;
 let hideAuto = localStorage.getItem("gb-auto-notes") === "0";
 let showRemarks = localStorage.getItem("gb-remarks") !== "0";
 let curveEdges = localStorage.getItem("gb-curve") !== "0";
+let showSide = localStorage.getItem("gb-side") !== "0";
 let cam = { x: 40, y: 40, k: 1 };
 let graphSize = { w: 1, h: 1 };
 let nodePos = {};
@@ -138,7 +139,6 @@ async function loadGraph() {
     lastFitItem = selectedId;
     fitView();
   }
-  renderDetail();
 }
 
 function layout(g) {
@@ -395,11 +395,16 @@ function bindCanvas() {
     fitView();
   };
   $("btnFit").addEventListener("mousedown", (e) => e.stopPropagation());
+  $("btnSide").addEventListener("mousedown", (e) => e.stopPropagation());
+  $("btnSide").onclick = (e) => {
+    e.stopPropagation();
+    showSide = !showSide;
+    syncSide();
+  };
   pane.addEventListener("click", () => {
     if (didPan || spaceDown || !selectedNode || !graphData) return;
     selectedNode = null;
     renderGraph(graphData);
-    renderDetail();
   });
   let fitMaxTimer = 0;
   let wasMax = false;
@@ -491,7 +496,6 @@ function renderGraph(g) {
       if (didPan || spaceDown) return;
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
-      renderDetail();
     });
     el.addEventListener("dblclick", () => {
       if (didPan || spaceDown) return;
@@ -501,38 +505,19 @@ function renderGraph(g) {
       e.preventDefault();
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
-      renderDetail();
       const acts = [
         { label: "切换到当前进度", run: () => restore(true) },
+        { label: "直接切换（不保留）", run: () => restore(false) },
         { label: "新建分支", run: newLine },
       ];
       if (!startIds.has(el.dataset.id)) {
+        acts.push({ label: "起名", run: tagNode });
         acts.push({ label: "备注", run: noteNode });
         acts.push({ label: "删除", run: deleteNode });
       }
       showMenu(e.clientX, e.clientY, acts);
     });
   });
-}
-
-function renderDetail() {
-  const empty = $("detailEmpty");
-  const body = $("detailBody");
-  if (!selectedNode) {
-    empty.hidden = false;
-    body.hidden = true;
-    $("btnNote").hidden = false;
-    $("btnDelete").hidden = false;
-    return;
-  }
-  empty.hidden = true;
-  body.hidden = false;
-  $("dTime").textContent = formatTime(selectedNode.time);
-  $("dMsg").textContent = startIds.has(selectedNode.id) ? "起始存档" : selectedNode.auto ? "自动存档" : shortMsg(selectedNode.message);
-  $("dNote").textContent = startIds.has(selectedNode.id) ? "" : selectedNode.note ? "备注：" + selectedNode.note : "";
-  $("dTags").textContent = (selectedNode.tags || []).length ? "名称：" + selectedNode.tags.join("、") : "";
-  $("btnNote").hidden = startIds.has(selectedNode.id);
-  $("btnDelete").hidden = startIds.has(selectedNode.id);
 }
 
 async function addFolder() {
@@ -698,12 +683,15 @@ $("btnPauseAll").onclick = async () => {
   const r = await api().pause_all(allPaused);
   $("btnPauseAll").textContent = r.paused ? "继续自动备份" : "暂停自动备份";
 };
-$("btnRestore").onclick = () => restore(true);
-$("btnOverwrite").onclick = () => restore(false);
-$("btnNewLine").onclick = newLine;
-$("btnTag").onclick = tagNode;
-$("btnNote").onclick = noteNode;
-$("btnDelete").onclick = deleteNode;
+function syncSide() {
+  $("side").hidden = !showSide;
+  document.querySelector("main").classList.toggle("side-off", !showSide);
+  $("btnSide").textContent = showSide ? "‹" : "›";
+  $("btnSide").title = showSide ? "隐藏游戏列表" : "显示游戏列表";
+  localStorage.setItem("gb-side", showSide ? "1" : "0");
+  if (graphData && !$("graphWrap").hidden) fitView();
+}
+syncSide();
 
 onReady(async () => {
   bindCanvas();

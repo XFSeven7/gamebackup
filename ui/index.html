@@ -17,7 +17,7 @@
     <button type="button" id="btnPauseAll">暂停自动备份</button>
   </header>
   <main>
-    <aside>
+    <aside id="side">
       <div class="side-head">
         <h2>我的游戏</h2>
         <button type="button" id="btnAdd" title="添加游戏存档">+</button>
@@ -25,6 +25,7 @@
       <ul id="itemList"></ul>
     </aside>
     <section id="graphPane">
+      <button type="button" id="btnSide" title="隐藏游戏列表">‹</button>
       <div id="empty">
         <p>选一个游戏存档所在的文件夹，之后会自动帮你记住每一版。</p>
         <button type="button" id="btnAddBig">选择游戏存档</button>
@@ -36,24 +37,6 @@
       </div>
       <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
     </section>
-    <aside class="detail" id="detail">
-      <h2>这一刻</h2>
-      <p id="detailEmpty">点图上的圆点，看看这一刻的存档。</p>
-      <div id="detailBody" hidden>
-        <p><b id="dTime"></b></p>
-        <p id="dMsg"></p>
-        <p id="dNote"></p>
-        <p id="dTags"></p>
-        <div class="btns">
-          <button type="button" id="btnRestore">切换到这一刻（保留当前进度）</button>
-          <button type="button" id="btnOverwrite">不保留当前进度，直接切换</button>
-          <button type="button" id="btnNewLine">从这一刻另存一条进度</button>
-          <button type="button" id="btnTag">给这一刻起名</button>
-          <button type="button" id="btnNote">写备注</button>
-          <button type="button" id="btnDelete">删除这一刻</button>
-        </div>
-      </div>
-    </aside>
   </main>
   <ul id="menu" hidden></ul>
   <div id="dlg" hidden>
