@@ -2,9 +2,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from paths import ui_index
+from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 
 
 class PathsTest(unittest.TestCase):
@@ -37,6 +38,14 @@ class PathsTest(unittest.TestCase):
                         delattr(sys, "_MEIPASS")
                 else:
                     sys._MEIPASS = old_mei
+
+    def test_help_text(self):
+        self.assertIn("Microsoft Edge WebView2", WEBVIEW2_HELP)
+        self.assertIn("https://go.microsoft.com/fwlink/p/?LinkId=2124703", WEBVIEW2_HELP)
+
+    def test_missing_when_registry_empty(self):
+        with patch("paths.winreg.OpenKey", side_effect=OSError):
+            self.assertFalse(webview2_installed())
 
 
 if __name__ == "__main__":

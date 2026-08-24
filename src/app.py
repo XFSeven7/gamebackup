@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import os
 import sys
 import threading
@@ -14,7 +15,7 @@ import pystray
 
 from backup import add_folder, backup_once, fork_branch, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
-from paths import ui_index
+from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from scheduler import Scheduler
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
@@ -210,6 +211,9 @@ class Api:
 
 
 def main() -> None:
+    if not webview2_installed():
+        ctypes.windll.user32.MessageBoxW(None, WEBVIEW2_HELP, "存档备份", 0x10)
+        return
     ROOT.mkdir(parents=True, exist_ok=True)
     scheduler = Scheduler(ROOT)
     scheduler.start()
