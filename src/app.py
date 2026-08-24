@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 import webview
 import pystray
 
-from backup import add_folder, backup_once, fork_branch, repo_dir, restore
+from backup import add_folder, backup_once, fork_branch, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from scheduler import Scheduler
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
@@ -199,6 +199,13 @@ class Api:
         if not it:
             return {"ok": False, "error": "没有找到这份存档"}
         return {"ok": True, **backup_once(ROOT, it)}
+
+    def save_now(self, item_id: str) -> dict:
+        cfg = load(ROOT)
+        it = find_item(cfg, item_id)
+        if not it:
+            return {"ok": False, "error": "没有找到这份存档"}
+        return do_save_now(ROOT, it)
 
 
 def main() -> None:

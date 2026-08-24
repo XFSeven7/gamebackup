@@ -639,6 +639,18 @@ document.addEventListener("click", () => {
 });
 $("btnAdd").onclick = addFolder;
 $("btnAddBig").onclick = addFolder;
+$("btnSaveNow").onclick = async () => {
+  if (!selectedId) return askOk("先选一个游戏");
+  setBusy(true, "正在保存…");
+  try {
+    const r = await api().save_now(selectedId);
+    if (!r.ok) return askOk(r.error);
+    if (r.skipped) return askOk("现在和上一版一样，没有新进度要存");
+    await loadGraph();
+  } finally {
+    setBusy(false);
+  }
+};
 $("showAuto").checked = !hideAuto;
 $("showAuto").onchange = (e) => {
   hideAuto = !e.target.checked;

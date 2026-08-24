@@ -7,7 +7,7 @@ from pathlib import Path
 
 from config import ManagedFolder, find_item, load, new_id, save
 from fingerprint import fingerprint
-from store import commit_auto, create_line, fork_node, graph, init_repo, reset_to, worktree_has_changes
+from store import commit_auto, commit_manual, create_line, fork_node, graph, init_repo, reset_to, worktree_has_changes
 from sync import mirror
 
 
@@ -66,6 +66,27 @@ def backup_once(root: Path, item: ManagedFolder) -> dict:
         return {"skipped": False, "reason": "ok"}
     except OSError as e:
         return {"skipped": True, "reason": str(e)}
+
+
+def save_now(root: Path, item: ManagedFolder) -> dict:
+    """立刻把当前游戏目录存成一版，暂停自动备份时也能用。"""
+    live = Path(item.path)
+    if not live.is_dir():
+        return {"ok": False, "error": "找不到这个文件夹"}
+    repo = repo_dir(root, item.id)
+    try:
+        mirror(live, repo)
+        if not worktree_has_changes(repo):
+            item.last_fingerprint = fingerprint(live)
+            _write_item(root, item)
+            return {"ok": True, "skipped": True, "reason": "unchanged"}
+        stamp = datetime.now().strftime("%H:%M:%S")
+        commit_manual(repo, f"手动保存 {stamp}")
+        item.last_fingerprint = fingerprint(live)
+        _write_item(root, item)
+        return {"ok": True, "skipped": False, "reason": "ok"}
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
 
 
 def restore(root: Path, item: ManagedFolder, commit_id: str, fork: bool) -> None:

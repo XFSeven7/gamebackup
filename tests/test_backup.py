@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from backup import add_folder, backup_once, restore
+from backup import add_folder, backup_once, restore, save_now
 from config import load
 from store import graph
 
@@ -38,6 +38,25 @@ class BackupTest(unittest.TestCase):
             r = backup_once(root, item)
             self.assertTrue(r["skipped"])
             self.assertEqual(r["reason"], "unchanged")
+
+    def test_save_now_makes_visible_commit(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "data"
+            live = Path(d) / "save"
+            live.mkdir()
+            (live / "s.sav").write_bytes(b"v1")
+            item = add_folder(root, live, "测试")
+            skip = save_now(root, item)
+            self.assertTrue(skip["skipped"])
+            time.sleep(0.05)
+            (live / "s.sav").write_bytes(b"v2")
+            r = save_now(root, item)
+            self.assertFalse(r["skipped"])
+            repo = root / "repos" / item.id
+            g = graph(repo, hide_auto=True, current_line=item.current_line)
+            msgs = [n["message"] for n in g["nodes"]]
+            self.assertTrue(any(m.startswith("手动保存") for m in msgs))
+            self.assertFalse(any(n["id"] == g["current_id"] and n["auto"] for n in g["nodes"]))
 
     def test_fork_restore_keeps_current_on_new_line(self):
         with tempfile.TemporaryDirectory() as d:
