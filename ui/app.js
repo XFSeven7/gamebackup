@@ -215,11 +215,23 @@ function fitView() {
   const pane = $("graphPane");
   if (!pane) return;
   const pad = 48;
-  const kw = (pane.clientWidth - pad * 2) / Math.max(graphSize.w, 1);
-  const kh = (pane.clientHeight - pad * 2) / Math.max(graphSize.h, 1);
+  const pts = Object.values(nodePos);
+  let minX = 0, maxX = graphSize.w, minY = 0, maxY = graphSize.h;
+  if (pts.length) {
+    minX = Math.min(...pts.map((p) => p.x)) - 20;
+    maxX = Math.max(...pts.map((p) => p.x)) + 210;
+    minY = Math.min(...pts.map((p) => p.y)) - 40;
+    maxY = Math.max(...pts.map((p) => p.y)) + 28;
+  }
+  const cw = Math.max(maxX - minX, 1);
+  const ch = Math.max(maxY - minY, 1);
+  const kw = (pane.clientWidth - pad * 2) / cw;
+  const kh = (pane.clientHeight - pad * 2) / ch;
   cam.k = Math.min(Math.max(Math.min(kw, kh), 0.2), 1.8);
-  cam.x = (pane.clientWidth - graphSize.w * cam.k) / 2;
-  cam.y = (pane.clientHeight - graphSize.h * cam.k) / 2;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  cam.x = pane.clientWidth / 2 - cx * cam.k;
+  cam.y = pane.clientHeight / 2 - cy * cam.k;
   applyCam();
 }
 
