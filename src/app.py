@@ -21,6 +21,7 @@ from store import add_tag, branch_exists, delete_line, delete_node as drop_node,
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
 UI = ui_index()
+APP_TITLE = "浪子宇的存档助手"
 
 
 def _icon_image() -> Image.Image:
@@ -212,7 +213,7 @@ class Api:
 
 def main() -> None:
     if not webview2_installed():
-        ctypes.windll.user32.MessageBoxW(None, WEBVIEW2_HELP, "存档备份", 0x10)
+        ctypes.windll.user32.MessageBoxW(None, WEBVIEW2_HELP, APP_TITLE, 0x10)
         return
     ROOT.mkdir(parents=True, exist_ok=True)
     scheduler = Scheduler(ROOT)
@@ -224,7 +225,7 @@ def main() -> None:
             webview.windows[0].show()
             webview.windows[0].restore()
         else:
-            webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
+            webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
 
     def quit_app(icon, _item):
         scheduler.stop()
@@ -238,10 +239,10 @@ def main() -> None:
         pystray.MenuItem("继续自动备份", lambda _i, _j: api.pause_all(False)),
         pystray.MenuItem("退出", quit_app),
     )
-    icon = pystray.Icon("gamebackup", _icon_image(), "存档备份", menu)
+    icon = pystray.Icon("gamebackup", _icon_image(), APP_TITLE, menu)
     threading.Thread(target=icon.run, daemon=True).start()
 
-    webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
+    webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
     webview.start()
     scheduler.stop()
 
