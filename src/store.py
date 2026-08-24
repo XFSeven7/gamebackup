@@ -109,7 +109,8 @@ def fork_node(path: Path, from_id: str, name: str) -> tuple[str, str]:
     from dulwich.objectspec import parse_commit
     from dulwich.objects import Commit
 
-    name = _unique_branch(path, name)
+    display = (name or "").strip() or "新进度"
+    ref_name = _unique_branch(path, display)
     repo = Repo(_p(path))
     parent = parse_commit(repo, from_id.encode("ascii"))
     now = int(time.time())
@@ -123,13 +124,13 @@ def fork_node(path: Path, from_id: str, name: str) -> tuple[str, str]:
     c.commit_timezone = 0
     c.author_timezone = 0
     c.encoding = b"UTF-8"
-    c.message = f"[fork] {name}".encode("utf-8")
+    c.message = f"[fork] {display}".encode("utf-8")
     repo.object_store.add_object(c)
-    ref = b"refs/heads/" + name.encode("utf-8")
+    ref = b"refs/heads/" + ref_name.encode("utf-8")
     repo.refs[ref] = c.id
     repo.refs.set_symbolic_ref(b"HEAD", ref)
     porcelain.reset(_p(path), "hard", treeish=_hex(c.id))
-    return _hex(c.id), name
+    return _hex(c.id), ref_name
 
 
 def checkout_line(path: Path, name: str) -> None:

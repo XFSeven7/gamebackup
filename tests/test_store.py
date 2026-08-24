@@ -84,6 +84,26 @@ class StoreTest(unittest.TestCase):
             self.assertNotIn(mid, ids)
             self.assertNotIn(tip, ids)
 
+    def test_remarks_can_repeat(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            init_repo(repo)
+            (repo / "save.dat").write_bytes(b"v1")
+            a = commit_manual(repo, "a")
+            (repo / "save.dat").write_bytes(b"v2")
+            b = commit_manual(repo, "b")
+            put_note(repo, a, "same")
+            put_note(repo, b, "same")
+            id1, br1 = fork_node(repo, a, "新进度")
+            id2, br2 = fork_node(repo, b, "新进度")
+            self.assertNotEqual(br1, br2)
+            g = graph(repo, hide_auto=False, current_line=br2)
+            by_id = {n["id"]: n for n in g["nodes"]}
+            self.assertEqual(by_id[a]["note"], "same")
+            self.assertEqual(by_id[b]["note"], "same")
+            self.assertEqual(by_id[id1]["message"], "[fork] 新进度")
+            self.assertEqual(by_id[id2]["message"], "[fork] 新进度")
+
     def test_delete_fork_keeps_original(self):
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
