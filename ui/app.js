@@ -19,6 +19,59 @@ let panLast = { x: 0, y: 0 };
 
 const $ = (id) => document.getElementById(id);
 
+function ask(opts) {
+  return new Promise((resolve) => {
+    $("menu").hidden = true;
+    const box = $("dlg");
+    const inp = $("dlgInput");
+    const cancel = $("dlgCancel");
+    $("dlgMsg").textContent = opts.message;
+    const isPrompt = opts.kind === "prompt";
+    const isAlert = opts.kind === "alert";
+    inp.hidden = !isPrompt;
+    cancel.hidden = isAlert;
+    if (isPrompt) inp.value = opts.value || "";
+    box.hidden = false;
+    (isPrompt ? inp : $("dlgOk")).focus();
+    if (isPrompt) inp.select();
+    let done = false;
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+      box.hidden = true;
+      window.removeEventListener("keydown", onKey, true);
+      $("dlgOk").onclick = null;
+      cancel.onclick = null;
+      box.onclick = null;
+      resolve(val);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish(isAlert ? undefined : isPrompt ? null : false);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        finish(isPrompt ? inp.value : isAlert ? undefined : true);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    $("dlgOk").onclick = () => finish(isPrompt ? inp.value : isAlert ? undefined : true);
+    cancel.onclick = () => finish(isPrompt ? null : false);
+    box.onclick = (e) => {
+      if (e.target === box) finish(isPrompt ? null : isAlert ? undefined : false);
+    };
+  });
+}
+function askYes(msg) {
+  return ask({ kind: "confirm", message: msg });
+}
+function askText(msg, def) {
+  return ask({ kind: "prompt", message: msg, value: def });
+}
+function askOk(msg) {
+  return ask({ kind: "alert", message: msg });
+}
+
 function onReady(fn) {
   if (window.pywebview) fn();
   else window.addEventListener("pywebviewready", fn);
@@ -459,76 +512,76 @@ async function addFolder() {
   const path = await api().pick_folder();
   if (!path) return;
   const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
-  const name = prompt("给这个游戏起个名字，方便以后找", base);
+  const name = await askText("给这个游戏起个名字，方便以后找", base);
   if (name === null) return;
   const r = await api().add_folder(path, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   selectedId = r.item.id;
   await refreshItems();
   await loadGraph();
 }
 
 async function renameItem(id, old) {
-  const name = prompt("游戏叫什么名字？", old);
+  const name = await askText("游戏叫什么名字？", old);
   if (!name) return;
   const r = await api().rename_item(id, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await refreshItems();
 }
 
 async function restore(fork) {
   if (!selectedId || !selectedNode) return;
-  if (!confirm("切换存档前请先退出游戏，否则可能失败或被游戏改回去。\n\n现在已经退出游戏了吗？")) return;
+  if (!(await askYes("切换存档前请先退出游戏，否则可能失败或被游戏改回去。\n\n现在已经退出游戏了吗？"))) return;
   const extra = "如果开了 Steam 云存档，Steam 有可能又把存档改回去。";
   if (fork) {
-    if (!confirm("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra)) return;
-  } else if (!confirm("不保留当前进度，游戏会直接切换到这一刻。\n" + extra)) return;
+    if (!(await askYes("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra))) return;
+  } else if (!(await askYes("不保留当前进度，游戏会直接切换到这一刻。\n" + extra))) return;
   const r = await api().restore(selectedId, selectedNode.id, fork);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
 async function newLine() {
   if (!selectedId || !selectedNode) return;
-  if (!confirm("新建分支会复制这一刻，并切换过去。请先退出游戏。\n\n现在已经退出游戏了吗？")) return;
-  const name = prompt("这条分支叫什么？", "新进度");
+  if (!(await askYes("新建分支会复制这一刻，并切换过去。请先退出游戏。\n\n现在已经退出游戏了吗？"))) return;
+  const name = await askText("这条分支叫什么？", "新进度");
   if (!name) return;
   const r = await api().create_line(selectedId, selectedNode.id, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
 async function tagNode() {
   if (!selectedId || !selectedNode) return;
-  const name = prompt("给这一刻起个名字，方便以后找", "打 Boss 前");
+  const name = await askText("给这一刻起个名字，方便以后找", "打 Boss 前");
   if (!name) return;
   const r = await api().tag(selectedId, selectedNode.id, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
 async function noteNode() {
   if (!selectedId || !selectedNode) return;
   if (startIds.has(selectedNode.id)) return;
-  const text = prompt("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
+  const text = await askText("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
   if (text === null) return;
   const r = await api().set_note(selectedId, selectedNode.id, text);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
 async function renameLine(old) {
-  const name = prompt("这条进度叫什么？", old);
+  const name = await askText("这条进度叫什么？", old);
   if (!name) return;
   const r = await api().rename_line(selectedId, old, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
 async function delLine(name) {
-  if (!confirm("从图上删掉这条进度？游戏里的存档文件不会被删。")) return;
+  if (!(await askYes("从图上删掉这条进度？游戏里的存档文件不会被删。"))) return;
   const r = await api().delete_line(selectedId, name);
-  if (!r.ok) return alert(r.error);
+  if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
 
