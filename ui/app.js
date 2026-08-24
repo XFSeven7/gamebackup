@@ -627,10 +627,13 @@ function formatTime(t) {
 }
 
 function nodeRemark(n) {
-  if (n.note) return clip(n.note, 20);
-  if (n.tags && n.tags[0]) return clip(n.tags[0], 20);
-  if (n.auto) return "自动存档";
-  return clip(shortMsg(n.message) || "存档", 20);
+  let s = "";
+  if (n.note) s = n.note;
+  else if (n.tags && n.tags[0]) s = n.tags[0];
+  else if (n.auto) return "自动存档";
+  else return clip(shortMsg(n.message) || "存档", 20);
+  if (n.auto && !s.includes("自动")) s = "自动 " + s;
+  return clip(s, 20);
 }
 
 function clip(s, n) {
