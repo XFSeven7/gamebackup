@@ -331,7 +331,7 @@ def _display_line(name: str) -> str:
 
 
 def filter_auto_nodes(g: dict, hide_auto: bool) -> dict:
-    """纯自动备份始终隐藏。hide_auto 为 False 时再显示带备注/名称的自动节点。"""
+    """关掉时藏纯自动点。打开时画出所有自动存档。"""
     by_id = {n["id"]: n for n in g["nodes"]}
     tips = {ln["tip"] for ln in g["lines"]}
     keep = {
@@ -340,7 +340,7 @@ def filter_auto_nodes(g: dict, hide_auto: bool) -> dict:
         if (not n["auto"])
         or n["id"] in tips
         or not n["parents"]
-        or (not hide_auto and (n["note"] or n["tags"]))
+        or (not hide_auto)
     }
 
     def nearest(start: str) -> str | None:

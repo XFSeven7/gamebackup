@@ -46,7 +46,7 @@ class GraphFilterTest(unittest.TestCase):
         c3 = next(n for n in out["nodes"] if n["id"] == "c3")
         self.assertEqual(c3["parents"], ["c1"])
 
-    def test_show_noted_auto_keeps_notes_hides_plain(self):
+    def test_show_auto_keeps_plain_autos(self):
         nodes = [
             _node("c0", auto=True),
             _node("c1", ["c0"], auto=True),
@@ -55,12 +55,7 @@ class GraphFilterTest(unittest.TestCase):
         ]
         shown = filter_auto_nodes(_graph(nodes), hide_auto=False)
         ids = {n["id"] for n in shown["nodes"]}
-        self.assertIn("c0", ids)
-        self.assertIn("c2", ids)
-        self.assertIn("c3", ids)
-        self.assertNotIn("c1", ids)
-        c2 = next(n for n in shown["nodes"] if n["id"] == "c2")
-        self.assertEqual(c2["parents"], ["c0"])
+        self.assertEqual(ids, {"c0", "c1", "c2", "c3"})
 
         hidden = filter_auto_nodes(_graph(nodes), hide_auto=True)
         hid = {n["id"] for n in hidden["nodes"]}

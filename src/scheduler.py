@@ -52,5 +52,5 @@ class Scheduler:
                     self.on_tick()
             interval = max(10, load(self.root).interval_sec)
         except Exception:
-            interval = 60
+            interval = 15
         self._arm(interval)

@@ -20,7 +20,7 @@ class ManagedFolder:
 
 @dataclass
 class AppConfig:
-    interval_sec: int = 60
+    interval_sec: int = 15
     items: list[ManagedFolder] = field(default_factory=list)
 
 
@@ -34,7 +34,14 @@ def load(root: Path) -> AppConfig:
         return AppConfig()
     raw = json.loads(p.read_text(encoding="utf-8"))
     items = [ManagedFolder(**it) for it in raw.get("items", [])]
-    return AppConfig(interval_sec=int(raw.get("interval_sec", 60)), items=items)
+    interval = int(raw.get("interval_sec", 15))
+    # ponytail: 旧默认 60s，没有设置项；只迁这一档，别动用户以后可能设的更长间隔。
+    if interval == 60:
+        interval = 15
+        cfg = AppConfig(interval_sec=interval, items=items)
+        save(root, cfg)
+        return cfg
+    return AppConfig(interval_sec=interval, items=items)
 
 
 def save(root: Path, cfg: AppConfig) -> None:
