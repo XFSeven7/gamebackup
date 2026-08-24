@@ -5,6 +5,7 @@ let selectedId = null;
 let graphData = null;
 let selectedNode = null;
 let hideAuto = true;
+let curveEdges = localStorage.getItem("gb-curve") !== "0";
 let cam = { x: 40, y: 40, k: 1 };
 let graphSize = { w: 1, h: 1 };
 let nodePos = {};
@@ -264,7 +265,11 @@ function renderGraph(g) {
     (n.parents || []).forEach((p) => {
       if (rowOf[p] === undefined) return;
       const hi = current.has(n.id) && current.has(p);
-      edges += `<path d="M ${x(n.id)} ${y(n.id)} C ${x(n.id)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${y(p)}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
+      const x1 = x(n.id), y1 = y(n.id), x2 = x(p), y2 = y(p);
+      const d = curveEdges
+        ? `M ${x1} ${y1} C ${x1} ${(y1 + y2) / 2}, ${x2} ${(y1 + y2) / 2}, ${x2} ${y2}`
+        : `M ${x1} ${y1} L ${x1} ${(y1 + y2) / 2} L ${x2} ${(y1 + y2) / 2} L ${x2} ${y2}`;
+      edges += `<path d="${d}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
     });
   });
   startIds = new Set();
@@ -468,6 +473,19 @@ $("showAuto").onchange = (e) => {
   hideAuto = !e.target.checked;
   loadGraph();
 };
+function syncEdgeButtons() {
+  $("btnCurve").classList.toggle("on", curveEdges);
+  $("btnStraight").classList.toggle("on", !curveEdges);
+}
+function setCurveEdges(on) {
+  curveEdges = on;
+  localStorage.setItem("gb-curve", on ? "1" : "0");
+  syncEdgeButtons();
+  if (graphData) renderGraph(graphData);
+}
+$("btnCurve").onclick = () => setCurveEdges(true);
+$("btnStraight").onclick = () => setCurveEdges(false);
+syncEdgeButtons();
 let allPaused = false;
 $("btnPauseAll").onclick = async () => {
   allPaused = !allPaused;
