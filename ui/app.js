@@ -266,14 +266,27 @@ function renderGraph(g) {
       edges += `<path d="M ${x(n.id)} ${y(n.id)} C ${x(n.id)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${y(p)}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
     });
   });
+  const startIds = new Set();
+  nodes.forEach((n) => {
+    if (!(n.parents || []).some((p) => rowOf[p] !== undefined)) startIds.add(n.id);
+  });
+  if (!startIds.size && nodes.length) {
+    const oldest = nodes.reduce((a, b) => (a.time <= b.time ? a : b));
+    startIds.add(oldest.id);
+  }
   let dots = "";
   nodes.forEach((n) => {
     const sel = selectedNode && selectedNode.id === n.id;
     const isCur = n.id === g.current_id;
+    const isStart = startIds.has(n.id);
     const r = n.auto ? 5 : 7;
-    const fill = isCur ? "#e6b325" : n.auto ? "#777" : "#3d8bfd";
+    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : n.auto ? "#777" : "#3d8bfd";
     const remark = nodeRemark(n);
-    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">正在用</text>` : "";
+    let badge = "";
+    if (isCur && isStart) badge = "正在用 · 起始存档";
+    else if (isCur) badge = "正在用";
+    else if (isStart) badge = "起始存档";
+    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="${isCur ? "#e6b325" : "#6cbe8a"}" font-size="11">${badge}</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
       ${curTxt}
