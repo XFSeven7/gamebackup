@@ -289,12 +289,13 @@ function onNodeLine(nodes, nodeId) {
 }
 
 function applyCam() {
-  const world = $("graphWorld");
+  const camEl = $("graphCam");
   const pane = $("graphPane");
-  if (!world || !pane) return;
-  world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})`;
-  pane.style.backgroundSize = `${22 * cam.k}px ${22 * cam.k}px`;
-  pane.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+  if (pane) {
+    pane.style.backgroundSize = `${22 * cam.k}px ${22 * cam.k}px`;
+    pane.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+  }
+  if (camEl) camEl.setAttribute("transform", `translate(${cam.x} ${cam.y}) scale(${cam.k})`);
 }
 
 function fitView() {
@@ -439,9 +440,9 @@ function renderGraph(g) {
   const W = Math.max(400, PAD_LEFT + lastX + LABEL_W);
   const H = Math.max(220, PAD_TOP + rows * ROW_H + PAD_BOTTOM);
   const svg = $("graph");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.setAttribute("width", W);
-  svg.setAttribute("height", H);
+  svg.removeAttribute("viewBox");
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
   svg.classList.toggle("hide-remarks", !showRemarks);
   svg.setAttribute("overflow", "visible");
   const x = (id) => PAD_LEFT + ((colX && colX[colOf[id]]) != null ? colX[colOf[id]] : colOf[id] * COL_W);
@@ -481,15 +482,15 @@ function renderGraph(g) {
     const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : "#777";
     const remark = isStart ? "起始存档" : nodeRemark(n);
     const badge = isCur ? "正在用" : "";
-    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">${badge}</text>` : "";
+    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="12" text-rendering="geometricPrecision">${badge}</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" stroke-width="${sel ? 2.5 : 0}" />
       ${curTxt}
-      <text class="remark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="${sel ? 13 : 12}" font-weight="${sel ? 700 : 400}">${escapeHtml(remark)}</text>
-      <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="11">${escapeHtml(formatTime(n.time))}</text>
+      <text class="remark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="13" font-weight="${sel ? 700 : 600}" text-rendering="geometricPrecision">${escapeHtml(remark)}</text>
+      <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="12" text-rendering="geometricPrecision">${escapeHtml(formatTime(n.time))}</text>
     </g>`;
   });
-  svg.innerHTML = edges + dots;
+  svg.innerHTML = `<g id="graphCam" transform="translate(${cam.x} ${cam.y}) scale(${cam.k})">${edges}${dots}</g>`;
   svg.querySelectorAll("g.node").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
