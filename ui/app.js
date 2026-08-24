@@ -511,7 +511,6 @@ function renderGraph(g) {
         { label: "新建分支", run: newLine },
       ];
       if (!startIds.has(el.dataset.id)) {
-        acts.push({ label: "起名", run: tagNode });
         acts.push({ label: "备注", run: noteNode });
         acts.push({ label: "删除", run: deleteNode });
       }
@@ -571,15 +570,6 @@ async function newLine() {
   } finally {
     setBusy(false);
   }
-}
-
-async function tagNode() {
-  if (!selectedId || !selectedNode) return;
-  const name = await askText("给这一刻起个名字，方便以后找", "打 Boss 前");
-  if (!name) return;
-  const r = await api().tag(selectedId, selectedNode.id, name);
-  if (!r.ok) return askOk(r.error);
-  await loadGraph();
 }
 
 async function noteNode() {
