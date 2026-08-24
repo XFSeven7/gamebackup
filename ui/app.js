@@ -708,8 +708,23 @@ function syncSide() {
 }
 syncSide();
 
+let graphRev = 0;
+async function pullGraphIfChanged() {
+  if (!$("busy").hidden || !selectedId) return;
+  const r = await api().graph_rev();
+  if (r.rev === graphRev) return;
+  graphRev = r.rev;
+  await loadGraph();
+}
+
 onReady(async () => {
   bindCanvas();
   await refreshItems();
   if (selectedId) await loadGraph();
+  try {
+    graphRev = (await api().graph_rev()).rev;
+  } catch (e) {}
+  setInterval(() => {
+    pullGraphIfChanged();
+  }, 2000);
 });

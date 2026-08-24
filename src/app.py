@@ -210,6 +210,9 @@ class Api:
             return {"ok": False, "error": "没有找到这份存档"}
         return do_save_now(ROOT, it)
 
+    def graph_rev(self) -> dict:
+        return {"rev": self.scheduler.generation}
+
 
 def main() -> None:
     if not webview2_installed():

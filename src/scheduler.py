@@ -16,6 +16,7 @@ class Scheduler:
         self._timer: threading.Timer | None = None
         self._pause_all = False
         self._lock = threading.Lock()
+        self.generation = 0
 
     def start(self) -> None:
         self._arm(0.5)
@@ -39,8 +40,14 @@ class Scheduler:
         try:
             if not self._pause_all:
                 cfg = load(self.root)
+                bumped = False
                 for item in cfg.items:
-                    backup_once(self.root, item)
+                    r = backup_once(self.root, item)
+                    if not r.get("skipped"):
+                        bumped = True
+                if bumped:
+                    with self._lock:
+                        self.generation += 1
                 if self.on_tick:
                     self.on_tick()
             interval = max(10, load(self.root).interval_sec)
