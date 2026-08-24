@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from backup import add_folder, backup_once, dir_nbytes, format_bytes, restore, save_now
+from backup import add_folder, backup_once, dir_nbytes, format_bytes, remove_item, restore, save_now
 from config import load
 from store import graph
 
@@ -85,6 +85,29 @@ class BackupTest(unittest.TestCase):
             pre = next(n for n in names if n.startswith("换档前-"))
             checkout_line(repo, pre)
             self.assertEqual((repo / "s.sav").read_bytes(), b"new")
+
+    def test_remove_item_drops_backup_keeps_game_saves(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "data"
+            a = Path(d) / "gameA"
+            b = Path(d) / "gameB"
+            a.mkdir()
+            b.mkdir()
+            (a / "s.sav").write_bytes(b"A")
+            (b / "s.sav").write_bytes(b"B")
+            ia = add_folder(root, a, "阿尔")
+            ib = add_folder(root, b, "贝塔")
+            repo_a = root / "repos" / ia.id
+            repo_b = root / "repos" / ib.id
+            self.assertTrue(repo_a.is_dir())
+            remove_item(root, ia.id)
+            cfg = load(root)
+            self.assertEqual([it.id for it in cfg.items], [ib.id])
+            self.assertFalse(repo_a.exists())
+            self.assertTrue(repo_b.is_dir())
+            self.assertEqual((a / "s.sav").read_bytes(), b"A")
+            self.assertEqual((b / "s.sav").read_bytes(), b"B")
+            self.assertTrue(a.is_dir())
 
 
 class SizeTextTest(unittest.TestCase):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -64,6 +65,23 @@ def add_folder(root: Path, live_path: Path, name: str) -> ManagedFolder:
     cfg = load(root)
     found = find_item(cfg, item.id)
     return found if found else item
+
+
+def remove_item(root: Path, item_id: str) -> None:
+    """去掉管理项和备份历史。游戏原存档文件夹一律不删。"""
+    root = Path(root).resolve()
+    cfg = load(root)
+    it = find_item(cfg, item_id)
+    if not it:
+        raise KeyError(item_id)
+    repos = (root / "repos").resolve()
+    repo = repo_dir(root, it.id).resolve()
+    if repo.parent != repos or repo.name != it.id:
+        raise ValueError("备份目录不合法")
+    if repo.exists():
+        shutil.rmtree(repo)
+    cfg.items = [x for x in cfg.items if x.id != it.id]
+    save(root, cfg)
 
 
 def backup_once(root: Path, item: ManagedFolder) -> dict:

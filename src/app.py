@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 import webview
 import pystray
 
-from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, repo_dir, restore, save_now as do_save_now
+from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from scheduler import Scheduler
@@ -81,6 +81,15 @@ class Api:
         it.name = name.strip() or it.name
         save(ROOT, cfg)
         return {"ok": True}
+
+    def remove_item(self, item_id: str) -> dict:
+        try:
+            drop_managed(ROOT, item_id)
+            return {"ok": True}
+        except KeyError:
+            return {"ok": False, "error": "没有找到这份存档"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def graph(self, item_id: str, hide_auto: bool) -> dict:
         cfg = load(ROOT)

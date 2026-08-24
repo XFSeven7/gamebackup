@@ -116,6 +116,7 @@ async function refreshItems() {
       showMenu(e.clientX, e.clientY, [
         { label: "改名字", run: () => renameItem(it.id, it.name) },
         { label: it.paused ? "继续自动备份" : "暂停自动备份", run: () => api().pause_item(it.id, !it.paused).then(loadGraph) },
+        { label: "删除", run: () => removeItem(it.id, it.name) },
       ]);
     };
     ul.appendChild(li);
@@ -567,6 +568,20 @@ async function renameItem(id, old) {
   const r = await api().rename_item(id, name);
   if (!r.ok) return askOk(r.error);
   await refreshItems();
+}
+
+async function removeItem(id, name) {
+  if (!(await askYes(`会从本工具里去掉「${name}」，并删掉这里记下的备份。\n\n游戏自己的存档文件不会被删。\n\n确定删除？`))) return;
+  const r = await api().remove_item(id);
+  if (!r.ok) return askOk(r.error);
+  if (selectedId === id) {
+    selectedId = null;
+    selectedNode = null;
+    graphData = null;
+    lastFitItem = null;
+  }
+  await refreshItems();
+  if (selectedId) await loadGraph();
 }
 
 async function restore() {
