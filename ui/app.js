@@ -634,8 +634,10 @@ function nodeRemark(n) {
   else s = shortMsg(n.message) || "存档";
   s = String(s)
     .replace(/^(自动存档|手动保存)\s*/, "")
-    .replace(/^(自动|手动)\s*[-–—]?\s*/, "");
-  return clip((n.auto ? "自动 - " : "手动 - ") + (s || "存档"), 20);
+    .replace(/^(自动|手动)\s*[-–—]?\s*/, "")
+    .replace(/\s*[（(](自动|手动)[）)]\s*$/, "");
+  const mark = n.auto ? "(自动)" : "(手动)";
+  return clip(s || "存档", 20 - mark.length) + mark;
 }
 
 function clip(s, n) {
