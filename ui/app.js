@@ -328,6 +328,21 @@ function bindCanvas() {
     renderGraph(graphData);
     renderDetail();
   });
+  let fitMaxTimer = 0;
+  let wasMax = false;
+  const looksMax = () =>
+    screen.availWidth - window.innerWidth <= 24 &&
+    screen.availHeight - window.innerHeight <= 96;
+  window.addEventListener("resize", () => {
+    clearTimeout(fitMaxTimer);
+    fitMaxTimer = setTimeout(() => {
+      const maxed = looksMax();
+      const became = maxed && !wasMax;
+      wasMax = maxed;
+      if (!became || $("graphWrap").hidden || !graphData) return;
+      fitView();
+    }, 80);
+  });
 }
 
 function renderGraph(g) {
