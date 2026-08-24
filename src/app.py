@@ -14,11 +14,12 @@ import pystray
 
 from backup import add_folder, backup_once, fork_branch, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
+from paths import ui_index
 from scheduler import Scheduler
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
-UI = Path(__file__).resolve().parent.parent / "ui" / "index.html"
+UI = ui_index()
 
 
 def _icon_image() -> Image.Image:
