@@ -107,7 +107,6 @@ async function refreshItems() {
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
-    $("lineList").innerHTML = "";
   }
 }
 
@@ -134,40 +133,12 @@ async function loadGraph() {
   $("empty").hidden = true;
   $("graphWrap").hidden = false;
   $("btnFit").hidden = false;
-  renderLines(g);
   renderGraph(g);
   if (lastFitItem !== selectedId) {
     lastFitItem = selectedId;
     fitView();
   }
   renderDetail();
-}
-
-function renderLines(g) {
-  const ul = $("lineList");
-  ul.innerHTML = "";
-  (g.lines || []).forEach((ln) => {
-    const li = document.createElement("li");
-    li.className = "line" + (ln.name === g.current_line ? " current active" : "");
-    li.textContent = ln.display || ln.name;
-    li.onclick = () => {
-      const n = (g.nodes || []).find((x) => x.id === ln.tip);
-      if (n) {
-        selectedNode = n;
-        renderGraph(g);
-        renderDetail();
-        panToNode(n.id);
-      }
-    };
-    li.oncontextmenu = (e) => {
-      e.preventDefault();
-      showMenu(e.clientX, e.clientY, [
-        { label: "改名字", run: () => renameLine(ln.name) },
-        { label: "删掉这条进度", run: () => delLine(ln.name) },
-      ]);
-    };
-    ul.appendChild(li);
-  });
 }
 
 function layout(g) {
@@ -632,21 +603,6 @@ async function noteNode() {
   const text = await askText("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
   if (text === null) return;
   const r = await api().set_note(selectedId, selectedNode.id, text);
-  if (!r.ok) return askOk(r.error);
-  await loadGraph();
-}
-
-async function renameLine(old) {
-  const name = await askText("这条进度叫什么？", old);
-  if (!name) return;
-  const r = await api().rename_line(selectedId, old, name);
-  if (!r.ok) return askOk(r.error);
-  await loadGraph();
-}
-
-async function delLine(name) {
-  if (!(await askYes("从图上删掉这条进度？游戏里的存档文件不会被删。"))) return;
-  const r = await api().delete_line(selectedId, name);
   if (!r.ok) return askOk(r.error);
   await loadGraph();
 }
