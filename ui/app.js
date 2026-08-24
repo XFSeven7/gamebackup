@@ -72,6 +72,11 @@ function askOk(msg) {
   return ask({ kind: "alert", message: msg });
 }
 
+function setBusy(on, text) {
+  if (text) $("busyText").textContent = text;
+  $("busy").hidden = !on;
+}
+
 function onReady(fn) {
   if (window.pywebview) fn();
   else window.addEventListener("pywebviewready", fn);
@@ -587,9 +592,14 @@ async function restore(fork) {
   if (fork) {
     if (!(await askYes("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra))) return;
   } else if (!(await askYes("不保留当前进度，游戏会直接切换到这一刻。\n" + extra))) return;
-  const r = await api().restore(selectedId, selectedNode.id, fork);
-  if (!r.ok) return askOk(r.error);
-  await loadGraph();
+  setBusy(true, "正在切换进度…");
+  try {
+    const r = await api().restore(selectedId, selectedNode.id, fork);
+    if (!r.ok) return askOk(r.error);
+    await loadGraph();
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function newLine() {
@@ -597,9 +607,14 @@ async function newLine() {
   if (!(await askYes("新建分支会复制这一刻，并切换过去。请先退出游戏。\n\n现在已经退出游戏了吗？"))) return;
   const name = await askText("这条分支叫什么？", "新进度");
   if (!name) return;
-  const r = await api().create_line(selectedId, selectedNode.id, name);
-  if (!r.ok) return askOk(r.error);
-  await loadGraph();
+  setBusy(true, "正在切换进度…");
+  try {
+    const r = await api().create_line(selectedId, selectedNode.id, name);
+    if (!r.ok) return askOk(r.error);
+    await loadGraph();
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function tagNode() {
