@@ -137,8 +137,8 @@ async function loadGraph() {
     return;
   }
   graphData = g;
-  if (selectedNode && !(g.nodes || []).some((n) => n.id === selectedNode.id)) {
-    selectedNode = null;
+  if (selectedNode) {
+    selectedNode = (g.nodes || []).find((n) => n.id === selectedNode.id) || null;
   }
   $("empty").hidden = true;
   $("graphWrap").hidden = false;
@@ -258,7 +258,11 @@ let layoutCache = { key: "", value: null };
 
 function getLayout(g) {
   const k = layoutKey(g);
-  if (layoutCache.key === k && layoutCache.value) return layoutCache.value;
+  const nodes = (g.nodes || []).slice().sort((a, b) => b.time - a.time);
+  // 位置可以复用；节点上的备注必须用这一次的数据，否则改备注画面不刷新。
+  if (layoutCache.key === k && layoutCache.value) {
+    return { ...layoutCache.value, nodes };
+  }
   const value = layout(g);
   layoutCache = { key: k, value };
   return value;
