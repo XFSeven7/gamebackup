@@ -499,15 +499,14 @@ function renderGraph(g) {
     });
     el.addEventListener("dblclick", () => {
       if (didPan || spaceDown) return;
-      restore(true);
+      restore();
     });
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
       const acts = [
-        { label: "切换到当前进度", run: () => restore(true) },
-        { label: "直接切换（不保留）", run: () => restore(false) },
+        { label: "切换到当前进度", run: restore },
         { label: "新建分支", run: newLine },
       ];
       if (!startIds.has(el.dataset.id)) {
@@ -540,16 +539,13 @@ async function renameItem(id, old) {
   await refreshItems();
 }
 
-async function restore(fork) {
+async function restore() {
   if (!selectedId || !selectedNode) return;
   if (!(await askYes("切换存档前请先退出游戏，否则可能失败或被游戏改回去。\n\n现在已经退出游戏了吗？"))) return;
-  const extra = "如果开了 Steam 云存档，Steam 有可能又把存档改回去。";
-  if (fork) {
-    if (!(await askYes("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra))) return;
-  } else if (!(await askYes("不保留当前进度，游戏会直接切换到这一刻。\n" + extra))) return;
+  if (!(await askYes("会先把你现在的进度另外存一份，再切换到这一刻。如果开了 Steam 云存档，Steam 有可能又把存档改回去。"))) return;
   setBusy(true, "正在切换进度…");
   try {
-    const r = await api().restore(selectedId, selectedNode.id, fork);
+    const r = await api().restore(selectedId, selectedNode.id, true);
     if (!r.ok) return askOk(r.error);
     await loadGraph();
   } finally {
