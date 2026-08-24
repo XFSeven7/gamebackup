@@ -167,6 +167,89 @@ def delete_line(path: Path, name: str) -> None:
     del repo.refs[ref]
 
 
+def branch_exists(path: Path, name: str) -> bool:
+    repo = Repo(_p(path))
+    return b"refs/heads/" + name.encode("utf-8") in repo.refs
+
+
+def delete_node(path: Path, commit_id: str) -> None:
+    """删掉这一刻及其后续节点。起始存档不能删。"""
+    repo = Repo(_p(path))
+    target = commit_id.lower()
+    include: list[bytes] = []
+    for ref in repo.refs.keys():
+        if ref.startswith(b"refs/heads/"):
+            include.append(repo.refs[ref])
+    if not include:
+        raise ValueError("没有可删的进度")
+
+    nodes: dict[str, object] = {}
+    children: dict[str, list[str]] = {}
+    for entry in Walker(repo.object_store, include):
+        c = entry.commit
+        hid = _hex(c.id)
+        nodes[hid] = c
+        children.setdefault(hid, [])
+        for p in c.parents:
+            children.setdefault(_hex(p), []).append(hid)
+
+    if target not in nodes:
+        raise KeyError("没有这一刻")
+    if not getattr(nodes[target], "parents", None):
+        raise ValueError("起始存档不能删")
+
+    drop: set[str] = set()
+    stack = [target]
+    while stack:
+        cur = stack.pop()
+        if cur in drop:
+            continue
+        drop.add(cur)
+        stack.extend(children.get(cur, []))
+
+    def rewind(hid: str | None) -> str | None:
+        seen: set[str] = set()
+        while hid and hid not in seen:
+            seen.add(hid)
+            if hid not in drop:
+                return hid
+            pars = getattr(nodes.get(hid), "parents", None) if hid in nodes else None
+            hid = _hex(pars[0]) if pars else None
+        return None
+
+    for ref in list(repo.refs.keys()):
+        if not ref.startswith(b"refs/heads/"):
+            continue
+        new_tip = rewind(_hex(repo.refs[ref]))
+        if not new_tip:
+            if ref == b"refs/heads/main":
+                raise ValueError("起始存档不能删")
+            del repo.refs[ref]
+        else:
+            repo.refs[ref] = new_tip.encode("ascii")
+
+    for ref in list(repo.refs.keys()):
+        if not ref.startswith(b"refs/tags/"):
+            continue
+        pointed = repo.refs[ref]
+        obj = repo[pointed]
+        if getattr(obj, "object", None):
+            pointed = obj.object[1]
+        if _hex(pointed) in drop:
+            del repo.refs[ref]
+
+    try:
+        hid = rewind(_hex(repo.head()))
+        if hid:
+            porcelain.reset(_p(path), "hard", treeish=hid)
+            return
+    except Exception:
+        pass
+    if b"refs/heads/main" in repo.refs:
+        repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
+        porcelain.reset(_p(path), "hard", treeish=_hex(repo.refs[b"refs/heads/main"]))
+
+
 def put_note(path: Path, commit_id: str, text: str) -> None:
     porcelain.notes_add(_p(path), _sha_bytes(commit_id), text.encode("utf-8"))
 

@@ -15,7 +15,7 @@ import pystray
 from backup import add_folder, backup_once, fork_branch, repo_dir, restore
 from config import find_item, load, save
 from scheduler import Scheduler
-from store import add_tag, delete_line, graph, put_note, rename_line
+from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
 UI = Path(__file__).resolve().parent.parent / "ui" / "index.html"
@@ -164,6 +164,20 @@ class Api:
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    def delete_node(self, item_id: str, commit_id: str) -> dict:
+        cfg = load(ROOT)
+        it = find_item(cfg, item_id)
+        if not it:
+            return {"ok": False, "error": "没有找到这份存档"}
+        try:
+            drop_node(repo_dir(ROOT, it.id), commit_id)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        if not branch_exists(repo_dir(ROOT, it.id), it.current_line):
+            it.current_line = "main"
+            save(ROOT, cfg)
+        return {"ok": True}
 
     def pause_item(self, item_id: str, paused: bool) -> dict:
         cfg = load(ROOT)

@@ -9,6 +9,7 @@ from store import (
     commit_auto,
     commit_manual,
     create_line,
+    delete_node,
     fork_node,
     graph,
     init_repo,
@@ -63,6 +64,41 @@ class StoreTest(unittest.TestCase):
             self.assertFalse(n["auto"])
             self.assertTrue(n["fork"])
             self.assertIn(branch, {ln["name"] for ln in g["lines"]})
+
+    def test_delete_node_drops_self_and_descendants(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            init_repo(repo)
+            (repo / "save.dat").write_bytes(b"v1")
+            start = commit_auto(repo)
+            (repo / "save.dat").write_bytes(b"v2")
+            mid = commit_auto(repo)
+            (repo / "save.dat").write_bytes(b"v3")
+            tip = commit_auto(repo)
+            with self.assertRaises(ValueError):
+                delete_node(repo, start)
+            delete_node(repo, mid)
+            g = graph(repo, hide_auto=False, current_line="main")
+            ids = {n["id"] for n in g["nodes"]}
+            self.assertIn(start, ids)
+            self.assertNotIn(mid, ids)
+            self.assertNotIn(tip, ids)
+
+    def test_delete_fork_keeps_original(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            init_repo(repo)
+            (repo / "save.dat").write_bytes(b"v1")
+            a = commit_auto(repo)
+            (repo / "save.dat").write_bytes(b"v2")
+            b = commit_auto(repo)
+            fork_id, _branch = fork_node(repo, a, "支线")
+            delete_node(repo, fork_id)
+            g = graph(repo, hide_auto=False, current_line="main")
+            ids = {n["id"] for n in g["nodes"]}
+            self.assertIn(a, ids)
+            self.assertIn(b, ids)
+            self.assertNotIn(fork_id, ids)
 
 
 if __name__ == "__main__":

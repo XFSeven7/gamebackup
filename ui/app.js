@@ -123,6 +123,9 @@ async function loadGraph() {
     return;
   }
   graphData = g;
+  if (selectedNode && !(g.nodes || []).some((n) => n.id === selectedNode.id)) {
+    selectedNode = null;
+  }
   $("empty").hidden = true;
   $("graphWrap").hidden = false;
   $("btnFit").hidden = false;
@@ -528,7 +531,10 @@ function renderGraph(g) {
         { label: "切换到当前进度", run: () => restore(true) },
         { label: "新建分支", run: newLine },
       ];
-      if (!startIds.has(el.dataset.id)) acts.push({ label: "备注", run: noteNode });
+      if (!startIds.has(el.dataset.id)) {
+        acts.push({ label: "备注", run: noteNode });
+        acts.push({ label: "删除", run: deleteNode });
+      }
       showMenu(e.clientX, e.clientY, acts);
     });
   });
@@ -541,6 +547,7 @@ function renderDetail() {
     empty.hidden = false;
     body.hidden = true;
     $("btnNote").hidden = false;
+    $("btnDelete").hidden = false;
     return;
   }
   empty.hidden = true;
@@ -550,6 +557,7 @@ function renderDetail() {
   $("dNote").textContent = startIds.has(selectedNode.id) ? "" : selectedNode.note ? "备注：" + selectedNode.note : "";
   $("dTags").textContent = (selectedNode.tags || []).length ? "名称：" + selectedNode.tags.join("、") : "";
   $("btnNote").hidden = startIds.has(selectedNode.id);
+  $("btnDelete").hidden = startIds.has(selectedNode.id);
 }
 
 async function addFolder() {
@@ -626,6 +634,16 @@ async function delLine(name) {
   if (!(await askYes("从图上删掉这条进度？游戏里的存档文件不会被删。"))) return;
   const r = await api().delete_line(selectedId, name);
   if (!r.ok) return askOk(r.error);
+  await loadGraph();
+}
+
+async function deleteNode() {
+  if (!selectedId || !selectedNode) return;
+  if (startIds.has(selectedNode.id)) return;
+  if (!(await askYes("会删掉这一刻的备份，以及从这里长出来的后续备份。\n\n删了无法恢复。游戏里的存档文件不会被删。\n\n确定删除？"))) return;
+  const r = await api().delete_node(selectedId, selectedNode.id);
+  if (!r.ok) return askOk(r.error);
+  selectedNode = null;
   await loadGraph();
 }
 
@@ -715,6 +733,7 @@ $("btnOverwrite").onclick = () => restore(false);
 $("btnNewLine").onclick = newLine;
 $("btnTag").onclick = tagNode;
 $("btnNote").onclick = noteNode;
+$("btnDelete").onclick = deleteNode;
 
 onReady(async () => {
   bindCanvas();

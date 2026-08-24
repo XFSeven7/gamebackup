@@ -25,6 +25,7 @@ button {
 }
 button:hover { background: #3d3d3d; }
 #btnAdd, #btnAddBig, #btnRestore { background: var(--accent); border-color: #2d6fd0; color: #fff; }
+#btnDelete { background: #3a2222; border-color: var(--warn); color: #f0c0c0; }
 main { display: grid; grid-template-columns: 220px 1fr 240px; height: calc(100% - 48px); }
 aside { border-right: 1px solid var(--line); overflow: auto; padding: 12px; background: var(--panel); }
 aside.detail { border-right: none; border-left: 1px solid var(--line); }
