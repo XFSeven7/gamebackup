@@ -9,6 +9,7 @@ let cam = { x: 40, y: 40, k: 1 };
 let graphSize = { w: 1, h: 1 };
 let nodePos = {};
 let lastFitItem = null;
+let startIds = new Set();
 let spaceDown = false;
 let panning = false;
 let didPan = false;
@@ -266,7 +267,7 @@ function renderGraph(g) {
       edges += `<path d="M ${x(n.id)} ${y(n.id)} C ${x(n.id)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${(y(n.id) + y(p)) / 2}, ${x(p)} ${y(p)}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
     });
   });
-  const startIds = new Set();
+  startIds = new Set();
   nodes.forEach((n) => {
     if (!(n.parents || []).some((p) => rowOf[p] !== undefined)) startIds.add(n.id);
   });
@@ -281,12 +282,9 @@ function renderGraph(g) {
     const isStart = startIds.has(n.id);
     const r = n.auto ? 5 : 7;
     const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : n.auto ? "#777" : "#3d8bfd";
-    const remark = nodeRemark(n);
-    let badge = "";
-    if (isCur && isStart) badge = "正在用 · 起始存档";
-    else if (isCur) badge = "正在用";
-    else if (isStart) badge = "起始存档";
-    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="${isCur ? "#e6b325" : "#6cbe8a"}" font-size="11">${badge}</text>` : "";
+    const remark = isStart ? "起始存档" : nodeRemark(n);
+    const badge = isCur ? "正在用" : "";
+    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">${badge}</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
       ${curTxt}
@@ -311,13 +309,14 @@ function renderGraph(g) {
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
       renderDetail();
-      showMenu(e.clientX, e.clientY, [
+      const acts = [
         { label: "回到这一刻（先留着现在的进度）", run: () => restore(true) },
         { label: "直接换成这一刻", run: () => restore(false) },
         { label: "从这一刻另存一条进度", run: newLine },
         { label: "给这一刻起名", run: tagNode },
-        { label: "写备注", run: noteNode },
-      ]);
+      ];
+      if (!startIds.has(el.dataset.id)) acts.push({ label: "写备注", run: noteNode });
+      showMenu(e.clientX, e.clientY, acts);
     });
   });
 }
@@ -328,14 +327,16 @@ function renderDetail() {
   if (!selectedNode) {
     empty.hidden = false;
     body.hidden = true;
+    $("btnNote").hidden = false;
     return;
   }
   empty.hidden = true;
   body.hidden = false;
   $("dTime").textContent = formatTime(selectedNode.time);
-  $("dMsg").textContent = selectedNode.auto ? "自动存档" : selectedNode.message;
-  $("dNote").textContent = selectedNode.note ? "备注：" + selectedNode.note : "";
+  $("dMsg").textContent = startIds.has(selectedNode.id) ? "起始存档" : selectedNode.auto ? "自动存档" : selectedNode.message;
+  $("dNote").textContent = startIds.has(selectedNode.id) ? "" : selectedNode.note ? "备注：" + selectedNode.note : "";
   $("dTags").textContent = (selectedNode.tags || []).length ? "名称：" + selectedNode.tags.join("、") : "";
+  $("btnNote").hidden = startIds.has(selectedNode.id);
 }
 
 async function addFolder() {
@@ -390,6 +391,7 @@ async function tagNode() {
 
 async function noteNode() {
   if (!selectedId || !selectedNode) return;
+  if (startIds.has(selectedNode.id)) return;
   const text = prompt("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
   if (text === null) return;
   const r = await api().set_note(selectedId, selectedNode.id, text);
