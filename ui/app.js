@@ -5,6 +5,14 @@ let selectedId = null;
 let graphData = null;
 let selectedNode = null;
 let hideAuto = true;
+let cam = { x: 40, y: 40, k: 1 };
+let graphSize = { w: 1, h: 1 };
+let nodePos = {};
+let lastFitItem = null;
+let spaceDown = false;
+let panning = false;
+let didPan = false;
+let panLast = { x: 0, y: 0 };
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +45,7 @@ async function refreshItems() {
     selectedId = null;
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
+    $("btnFit").hidden = true;
     $("lineList").innerHTML = "";
   }
 }
@@ -54,13 +63,19 @@ async function loadGraph() {
   if (!g.ok) {
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
+    $("btnFit").hidden = true;
     return;
   }
   graphData = g;
   $("empty").hidden = true;
   $("graphWrap").hidden = false;
+  $("btnFit").hidden = false;
   renderLines(g);
   renderGraph(g);
+  if (lastFitItem !== selectedId) {
+    lastFitItem = selectedId;
+    fitView();
+  }
   renderDetail();
 }
 
@@ -77,7 +92,7 @@ function renderLines(g) {
         selectedNode = n;
         renderGraph(g);
         renderDetail();
-        document.getElementById("n-" + n.id)?.scrollIntoView({ block: "center" });
+        panToNode(n.id);
       }
     };
     li.oncontextmenu = (e) => {
@@ -123,6 +138,103 @@ function onCurrentLine(g) {
   return set;
 }
 
+function applyCam() {
+  const world = $("graphWorld");
+  const pane = $("graphPane");
+  if (!world || !pane) return;
+  world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.k})`;
+  pane.style.backgroundSize = `${22 * cam.k}px ${22 * cam.k}px`;
+  pane.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+}
+
+function fitView() {
+  const pane = $("graphPane");
+  if (!pane) return;
+  const pad = 48;
+  const kw = (pane.clientWidth - pad * 2) / Math.max(graphSize.w, 1);
+  const kh = (pane.clientHeight - pad * 2) / Math.max(graphSize.h, 1);
+  cam.k = Math.min(Math.max(Math.min(kw, kh), 0.2), 1.8);
+  cam.x = (pane.clientWidth - graphSize.w * cam.k) / 2;
+  cam.y = (pane.clientHeight - graphSize.h * cam.k) / 2;
+  applyCam();
+}
+
+function panToNode(id) {
+  const p = nodePos[id];
+  const pane = $("graphPane");
+  if (!p || !pane) return;
+  cam.x = pane.clientWidth / 2 - p.x * cam.k;
+  cam.y = pane.clientHeight / 2 - p.y * cam.k;
+  applyCam();
+}
+
+function bindCanvas() {
+  const pane = $("graphPane");
+  pane.title = "按住空格拖动，滚轮缩放";
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "Space") return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    e.preventDefault();
+    spaceDown = true;
+    pane.classList.add("pan");
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.code !== "Space") return;
+    spaceDown = false;
+    pane.classList.remove("pan");
+    if (!panning) pane.classList.remove("panning");
+  });
+
+  pane.addEventListener("mousedown", (e) => {
+    const wantPan = spaceDown || e.button === 1;
+    if (!wantPan) return;
+    e.preventDefault();
+    panning = true;
+    didPan = false;
+    panLast = { x: e.clientX, y: e.clientY };
+    pane.classList.add("panning");
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!panning) return;
+    const dx = e.clientX - panLast.x;
+    const dy = e.clientY - panLast.y;
+    if (Math.abs(dx) + Math.abs(dy) > 2) didPan = true;
+    cam.x += dx;
+    cam.y += dy;
+    panLast = { x: e.clientX, y: e.clientY };
+    applyCam();
+  });
+  window.addEventListener("mouseup", () => {
+    panning = false;
+    pane.classList.remove("panning");
+    setTimeout(() => {
+      didPan = false;
+    }, 0);
+  });
+  pane.addEventListener("wheel", (e) => {
+    if ($("graphWrap").hidden) return;
+    e.preventDefault();
+    const rect = pane.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    const nk = Math.min(4, Math.max(0.15, cam.k * factor));
+    const wx = (mx - cam.x) / cam.k;
+    const wy = (my - cam.y) / cam.k;
+    cam.k = nk;
+    cam.x = mx - wx * nk;
+    cam.y = my - wy * nk;
+    applyCam();
+  }, { passive: false });
+  $("btnFit").onclick = (e) => {
+    e.stopPropagation();
+    fitView();
+  };
+  $("btnFit").addEventListener("mousedown", (e) => e.stopPropagation());
+}
+
 function renderGraph(g) {
   const { nodes, colOf, rowOf, cols } = layout(g);
   const current = onCurrentLine(g);
@@ -134,6 +246,11 @@ function renderGraph(g) {
   svg.setAttribute("height", H);
   const x = (id) => 28 + colOf[id] * 36;
   const y = (id) => 28 + rowOf[id] * 52;
+  graphSize = { w: W, h: H };
+  nodePos = {};
+  nodes.forEach((n) => {
+    nodePos[n.id] = { x: x(n.id), y: y(n.id) };
+  });
   let edges = "";
   nodes.forEach((n) => {
     (n.parents || []).forEach((p) => {
@@ -160,11 +277,15 @@ function renderGraph(g) {
   svg.innerHTML = edges + dots;
   svg.querySelectorAll("g.node").forEach((el) => {
     el.addEventListener("click", () => {
+      if (didPan || spaceDown) return;
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
       renderDetail();
     });
-    el.addEventListener("dblclick", () => restore(true));
+    el.addEventListener("dblclick", () => {
+      if (didPan || spaceDown) return;
+      restore(true);
+    });
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
@@ -338,6 +459,7 @@ $("btnTag").onclick = tagNode;
 $("btnNote").onclick = noteNode;
 
 onReady(async () => {
+  bindCanvas();
   await refreshItems();
   if (selectedId) await loadGraph();
 });
