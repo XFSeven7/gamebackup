@@ -104,6 +104,7 @@ li.line.current { font-weight: 700; color: var(--current); }
 }
 .dlg-btns { display: flex; justify-content: flex-end; gap: 8px; }
 #dlgOk { background: var(--accent); border-color: #2d6fd0; color: #fff; }
+#dlgOk:disabled { opacity: 0.45; cursor: not-allowed; }
 #busy {
   position: fixed; inset: 0; z-index: 50;
   display: flex; align-items: center; justify-content: center;

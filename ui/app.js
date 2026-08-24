@@ -34,6 +34,12 @@ function ask(opts) {
     inp.hidden = !isPrompt;
     cancel.hidden = isAlert;
     if (isPrompt) inp.value = opts.value || "";
+    inp.placeholder = isPrompt ? (opts.placeholder || "") : "";
+    const need = opts.need || "";
+    const matchesNeed = () => !need || inp.value.trim() === need;
+    const syncOk = () => {
+      $("dlgOk").disabled = isPrompt && need && !matchesNeed();
+    };
     box.hidden = false;
     (isPrompt ? inp : $("dlgOk")).focus();
     if (isPrompt) inp.select();
@@ -44,7 +50,9 @@ function ask(opts) {
       box.hidden = true;
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("keyup", onKey, true);
+      inp.oninput = null;
       $("dlgOk").onclick = null;
+      $("dlgOk").disabled = false;
       cancel.onclick = null;
       box.onclick = null;
       swallowEnterUntil = Date.now() + 600;
@@ -60,12 +68,19 @@ function ask(opts) {
       } else if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (e.type === "keydown") finish(isPrompt ? inp.value : isAlert ? undefined : true);
+        if (e.type !== "keydown") return;
+        if (isPrompt && !matchesNeed()) return;
+        finish(isPrompt ? inp.value : isAlert ? undefined : true);
       }
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("keyup", onKey, true);
-    $("dlgOk").onclick = () => finish(isPrompt ? inp.value : isAlert ? undefined : true);
+    inp.oninput = syncOk;
+    syncOk();
+    $("dlgOk").onclick = () => {
+      if (isPrompt && !matchesNeed()) return;
+      finish(isPrompt ? inp.value : isAlert ? undefined : true);
+    };
     cancel.onclick = () => finish(isPrompt ? null : false);
     box.onclick = (e) => {
       if (e.target === box) finish(isPrompt ? null : isAlert ? undefined : false);
@@ -571,7 +586,15 @@ async function renameItem(id, old) {
 }
 
 async function removeItem(id, name) {
-  if (!(await askYes(`会从本工具里去掉「${name}」，并删掉这里记下的备份。\n\n游戏自己的存档文件不会被删。\n\n确定删除？`))) return;
+  const need = `我确定删除${name}存档`;
+  const typed = await ask({
+    kind: "prompt",
+    message: `会从本工具里去掉「${name}」，并删掉这里记下的备份。游戏自己的存档文件不会被删。\n\n请输入「${need}」后才能删除。`,
+    value: "",
+    placeholder: need,
+    need,
+  });
+  if (typed === null || typed.trim() !== need) return;
   const r = await api().remove_item(id);
   if (!r.ok) return askOk(r.error);
   if (selectedId === id) {
