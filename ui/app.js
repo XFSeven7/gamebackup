@@ -165,6 +165,7 @@ function renderLines(g) {
 function layout(g) {
   const nodes = (g.nodes || []).slice().sort((a, b) => b.time - a.time);
   const visible = new Set(nodes.map((n) => n.id));
+  const byId = new Map(nodes.map((n) => [n.id, n]));
   const kids = new Map();
   nodes.forEach((n) => {
     const pid = (n.parents || []).find((p) => visible.has(p));
@@ -176,23 +177,40 @@ function layout(g) {
     arr.sort((a, b) => a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   };
   kids.forEach(sortNodes);
+  const kidsOrdered = (id) => {
+    const cs = kids.get(id) || [];
+    return [...cs.filter((c) => !c.fork), ...cs.filter((c) => c.fork)];
+  };
   const roots = nodes.filter((n) => !(n.parents || []).some((p) => visible.has(p)));
   sortNodes(roots);
 
   const widthOf = {};
   const width = (id) => {
     if (widthOf[id] != null) return widthOf[id];
-    const cs = kids.get(id) || [];
+    const cs = kidsOrdered(id);
     if (!cs.length) return (widthOf[id] = 1);
-    return (widthOf[id] = cs.reduce((s, c) => s + width(c.id), 0));
+    const forkW = cs.filter((c) => c.fork).reduce((s, c) => s + width(c.id), 0);
+    const cont = cs.filter((c) => !c.fork);
+    if (!cont.length) return (widthOf[id] = 1 + forkW);
+    return (widthOf[id] = cont.reduce((s, c) => s + width(c.id), 0) + forkW);
   };
   roots.forEach((r) => width(r.id));
 
   const colOf = {};
   const place = (id, left) => {
-    const cs = kids.get(id) || [];
+    const cs = kidsOrdered(id);
+    const cont = cs.filter((c) => !c.fork);
     if (!cs.length) {
       colOf[id] = left;
+      return;
+    }
+    if (!cont.length) {
+      colOf[id] = left;
+      let x = left + 1;
+      cs.forEach((c) => {
+        place(c.id, x);
+        x += width(c.id);
+      });
       return;
     }
     let x = left;
@@ -200,7 +218,7 @@ function layout(g) {
       place(c.id, x);
       x += width(c.id);
     });
-    colOf[id] = colOf[cs[0].id];
+    colOf[id] = colOf[cont[0].id];
   };
   let left = 0;
   roots.forEach((r) => {
@@ -208,14 +226,36 @@ function layout(g) {
     left += width(r.id);
   });
 
+  const genOf = {};
+  const gen = (id) => {
+    if (genOf[id] != null) return genOf[id];
+    const n = byId.get(id);
+    const pid = (n?.parents || []).find((p) => visible.has(p));
+    if (!pid) return (genOf[id] = 0);
+    return (genOf[id] = n.fork ? gen(pid) : gen(pid) + 1);
+  };
+  nodes.forEach((n) => gen(n.id));
+  const maxG = Math.max(0, ...Object.values(genOf), 0);
+
   const rowOf = {};
-  nodes.forEach((n, i) => {
-    rowOf[n.id] = i;
+  nodes.forEach((n) => {
+    rowOf[n.id] = maxG - genOf[n.id];
     if (colOf[n.id] === undefined) colOf[n.id] = 0;
   });
   const colVals = Object.values(colOf);
   const cols = colVals.length ? Math.max(...colVals) + 1 : 1;
-  return { nodes, colOf, rowOf, cols };
+  const COL_GAP = 36;
+  const FORK_GAP = 200;
+  const gapAfter = Array.from({ length: Math.max(cols, 1) }, () => COL_GAP);
+  nodes.forEach((n) => {
+    nodes.forEach((m) => {
+      if (rowOf[n.id] !== rowOf[m.id]) return;
+      if (colOf[m.id] === colOf[n.id] + 1) gapAfter[colOf[n.id]] = FORK_GAP;
+    });
+  });
+  const colX = [0];
+  for (let i = 1; i < cols; i++) colX[i] = colX[i - 1] + gapAfter[i - 1];
+  return { nodes, colOf, rowOf, cols, colX };
 }
 
 function layoutKey(g) {
@@ -238,6 +278,7 @@ function getLayout(g) {
 
 function edgePath(x1, y1, x2, y2, curve) {
   if (x1 === x2) return `M ${x1} ${y1} L ${x2} ${y2}`;
+  if (y1 === y2) return `M ${x1} ${y1} L ${x2} ${y2}`;
   if (!curve) return `M ${x1} ${y1} L ${x1} ${y2} L ${x2} ${y2}`;
   const r = Math.min(12, Math.abs(y2 - y1) / 2, Math.abs(x2 - x1) / 2);
   if (r < 2) return `M ${x1} ${y1} L ${x1} ${y2} L ${x2} ${y2}`;
@@ -399,7 +440,7 @@ function bindCanvas() {
 }
 
 function renderGraph(g) {
-  const { nodes, colOf, rowOf, cols } = getLayout(g);
+  const { nodes, colOf, rowOf, cols, colX } = getLayout(g);
   const current = onCurrentLine(g);
   const picked = selectedNode ? onNodeLine(nodes, selectedNode.id) : new Set();
   const PAD_TOP = 44;
@@ -408,15 +449,18 @@ function renderGraph(g) {
   const COL_W = 36;
   const ROW_H = 56;
   const LABEL_W = 300;
-  const W = Math.max(400, PAD_LEFT + cols * COL_W + LABEL_W);
-  const H = Math.max(220, PAD_TOP + nodes.length * ROW_H + PAD_BOTTOM);
+  const rowVals = Object.values(rowOf);
+  const rows = rowVals.length ? Math.max(...rowVals) + 1 : 1;
+  const lastX = cols ? (colX && colX[cols - 1] != null ? colX[cols - 1] : (cols - 1) * COL_W) : 0;
+  const W = Math.max(400, PAD_LEFT + lastX + LABEL_W);
+  const H = Math.max(220, PAD_TOP + rows * ROW_H + PAD_BOTTOM);
   const svg = $("graph");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W);
   svg.setAttribute("height", H);
   svg.classList.toggle("hide-remarks", !showRemarks);
   svg.setAttribute("overflow", "visible");
-  const x = (id) => PAD_LEFT + colOf[id] * COL_W;
+  const x = (id) => PAD_LEFT + ((colX && colX[colOf[id]]) != null ? colX[colOf[id]] : colOf[id] * COL_W);
   const y = (id) => PAD_TOP + rowOf[id] * ROW_H;
   graphSize = { w: W, h: H };
   nodePos = {};
@@ -502,7 +546,7 @@ function renderDetail() {
   empty.hidden = true;
   body.hidden = false;
   $("dTime").textContent = formatTime(selectedNode.time);
-  $("dMsg").textContent = startIds.has(selectedNode.id) ? "起始存档" : selectedNode.auto ? "自动存档" : selectedNode.message;
+  $("dMsg").textContent = startIds.has(selectedNode.id) ? "起始存档" : selectedNode.auto ? "自动存档" : shortMsg(selectedNode.message);
   $("dNote").textContent = startIds.has(selectedNode.id) ? "" : selectedNode.note ? "备注：" + selectedNode.note : "";
   $("dTags").textContent = (selectedNode.tags || []).length ? "名称：" + selectedNode.tags.join("、") : "";
   $("btnNote").hidden = startIds.has(selectedNode.id);
@@ -622,7 +666,7 @@ function clip(s, n) {
 }
 
 function shortMsg(s) {
-  s = (s || "").replace(/^\[auto\]\s*/, "");
+  s = (s || "").replace(/^\[(?:auto|fork)\]\s*/, "");
   return s;
 }
 

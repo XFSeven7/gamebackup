@@ -118,7 +118,7 @@ def fork_node(path: Path, from_id: str, name: str) -> tuple[str, str]:
     c.commit_timezone = 0
     c.author_timezone = 0
     c.encoding = b"UTF-8"
-    c.message = name.encode("utf-8")
+    c.message = f"[fork] {name}".encode("utf-8")
     repo.object_store.add_object(c)
     ref = b"refs/heads/" + name.encode("utf-8")
     repo.refs[ref] = c.id
@@ -261,13 +261,21 @@ def graph(path: Path, hide_auto: bool, current_line: str) -> dict:
         msg = commit.message.decode("utf-8", errors="replace").strip()
         note_raw = porcelain.notes_show(_p(path), commit.id)
         note = note_raw.decode("utf-8", errors="replace") if note_raw else ""
+        auto = msg.startswith("[auto]")
+        fork = msg.startswith("[fork]")
+        if not fork and not auto and commit.parents:
+            try:
+                fork = repo[commit.parents[0]].tree == commit.tree
+            except KeyError:
+                fork = False
         nodes.append(
             {
                 "id": cid,
                 "parents": [_hex(p) for p in commit.parents],
                 "time": int(commit.commit_time),
                 "message": msg,
-                "auto": msg.startswith("[auto]"),
+                "auto": auto,
+                "fork": fork,
                 "note": note,
                 "tags": tags_on.get(cid, []),
             }

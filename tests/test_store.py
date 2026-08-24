@@ -61,6 +61,7 @@ class StoreTest(unittest.TestCase):
             n = next(x for x in g["nodes"] if x["id"] == new_id)
             self.assertEqual(n["parents"], [cid1])
             self.assertFalse(n["auto"])
+            self.assertTrue(n["fork"])
             self.assertIn(branch, {ln["name"] for ln in g["lines"]})
 
 
