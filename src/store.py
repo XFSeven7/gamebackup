@@ -262,8 +262,64 @@ def delete_node(path: Path, commit_id: str) -> None:
         porcelain.reset(_p(path), "hard", treeish=_hex(repo.refs[b"refs/heads/main"]))
 
 
+def _commit_has_children(path: Path, commit_id: str) -> bool:
+    repo = Repo(_p(path))
+    hid = commit_id.lower()
+    include = [repo.refs[r] for r in repo.refs.keys() if r.startswith(b"refs/heads/")]
+    if not include:
+        return False
+    for entry in Walker(repo.object_store, include):
+        for p in entry.commit.parents:
+            if _hex(p) == hid:
+                return True
+    return False
+
+
+def _retitle_leaf(path: Path, commit_id: str, message: str) -> str:
+    """叶子节点改提交说明，图上的标题才会跟着变。有后续节点则不改历史。"""
+    from dulwich.objectspec import parse_commit
+    from dulwich.objects import Commit
+
+    cid = commit_id.lower()
+    if _commit_has_children(path, cid):
+        return cid
+    repo = Repo(_p(path))
+    old = parse_commit(repo, cid.encode("ascii"))
+    old_msg = old.message.decode("utf-8", errors="replace")
+    if not old_msg.startswith("手动保存"):
+        return cid
+    c = Commit()
+    c.tree = old.tree
+    c.parents = old.parents
+    c.author = old.author
+    c.committer = old.committer
+    c.commit_time = old.commit_time
+    c.author_time = old.author_time
+    c.commit_timezone = old.commit_timezone
+    c.author_timezone = old.author_timezone
+    c.encoding = old.encoding or b"UTF-8"
+    c.message = message.encode("utf-8")
+    repo.object_store.add_object(c)
+    new_hex = _hex(c.id)
+    for ref in list(repo.refs.keys()):
+        if not ref.startswith(b"refs/heads/"):
+            continue
+        if _hex(repo.refs[ref]) == cid:
+            repo.refs[ref] = new_hex.encode("ascii")
+    try:
+        if _hex(repo.head()) == cid:
+            porcelain.reset(_p(path), "hard", treeish=new_hex)
+    except Exception:
+        pass
+    return new_hex
+
+
 def put_note(path: Path, commit_id: str, text: str) -> None:
-    porcelain.notes_add(_p(path), _sha_bytes(commit_id), text.encode("utf-8"))
+    text = (text or "").strip()
+    cid = commit_id.lower()
+    if text:
+        cid = _retitle_leaf(path, cid, text)
+    porcelain.notes_add(_p(path), _sha_bytes(cid), text.encode("utf-8"))
 
 
 def add_tag(path: Path, commit_id: str, name: str) -> None:

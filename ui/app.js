@@ -57,7 +57,7 @@ function ask(opts) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (e.type === "keydown") finish(isAlert ? undefined : isPrompt ? null : false);
-      } else if (e.key === "Enter") {
+      } else if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (e.type === "keydown") finish(isPrompt ? inp.value : isAlert ? undefined : true);
@@ -581,7 +581,7 @@ async function newLine() {
 async function noteNode() {
   if (!selectedId || !selectedNode) return;
   if (startIds.has(selectedNode.id)) return;
-  const text = await askText("写一句备注，比如刚打完哪个 Boss", selectedNode.note || "");
+  const text = await askText("写一句备注，比如刚打完哪个 Boss", selectedNode.note || nodeRemark(selectedNode));
   if (text === null) return;
   const r = await api().set_note(selectedId, selectedNode.id, text);
   if (!r.ok) return askOk(r.error);

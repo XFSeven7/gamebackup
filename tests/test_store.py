@@ -104,6 +104,20 @@ class StoreTest(unittest.TestCase):
             self.assertEqual(by_id[id1]["message"], "[fork] 新进度")
             self.assertEqual(by_id[id2]["message"], "[fork] 新进度")
 
+    def test_remark_replaces_manual_save_label(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            init_repo(repo)
+            (repo / "save.dat").write_bytes(b"v1")
+            commit_manual(repo, "起始")
+            (repo / "save.dat").write_bytes(b"v2")
+            cid = commit_manual(repo, "手动保存 12:00:00")
+            put_note(repo, cid, "boss")
+            g = graph(repo, hide_auto=False, current_line="main")
+            n = next(x for x in g["nodes"] if x["note"] == "boss" or x["message"] == "boss")
+            self.assertEqual(n["note"] or n["message"], "boss")
+            self.assertFalse(n["message"].startswith("手动保存"))
+
     def test_delete_fork_keeps_original(self):
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d) / "repo"
