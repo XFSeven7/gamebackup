@@ -238,14 +238,21 @@ function bindCanvas() {
 function renderGraph(g) {
   const { nodes, colOf, rowOf, cols } = layout(g);
   const current = onCurrentLine(g);
-  const W = Math.max(360, cols * 36 + 320);
-  const H = Math.max(200, nodes.length * 52 + 48);
+  const PAD_TOP = 44;
+  const PAD_BOTTOM = 32;
+  const PAD_LEFT = 24;
+  const COL_W = 36;
+  const ROW_H = 56;
+  const LABEL_W = 300;
+  const W = Math.max(400, PAD_LEFT + cols * COL_W + LABEL_W);
+  const H = Math.max(220, PAD_TOP + nodes.length * ROW_H + PAD_BOTTOM);
   const svg = $("graph");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W);
   svg.setAttribute("height", H);
-  const x = (id) => 28 + colOf[id] * 36;
-  const y = (id) => 28 + rowOf[id] * 52;
+  svg.setAttribute("overflow", "visible");
+  const x = (id) => PAD_LEFT + colOf[id] * COL_W;
+  const y = (id) => PAD_TOP + rowOf[id] * ROW_H;
   graphSize = { w: W, h: H };
   nodePos = {};
   nodes.forEach((n) => {
@@ -266,7 +273,7 @@ function renderGraph(g) {
     const r = n.auto ? 5 : 7;
     const fill = isCur ? "#e6b325" : n.auto ? "#777" : "#3d8bfd";
     const remark = nodeRemark(n);
-    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 22}" fill="#e6b325" font-size="11">正在用</text>` : "";
+    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">正在用</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
       ${curTxt}
