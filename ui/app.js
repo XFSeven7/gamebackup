@@ -20,6 +20,8 @@ let panLast = { x: 0, y: 0 };
 
 const $ = (id) => document.getElementById(id);
 
+let swallowEnterUntil = 0;
+
 function ask(opts) {
   return new Promise((resolve) => {
     $("menu").hidden = true;
@@ -41,21 +43,28 @@ function ask(opts) {
       done = true;
       box.hidden = true;
       window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keyup", onKey, true);
       $("dlgOk").onclick = null;
       cancel.onclick = null;
       box.onclick = null;
+      swallowEnterUntil = Date.now() + 600;
+      const ae = document.activeElement;
+      if (ae && ae.blur) ae.blur();
       resolve(val);
     };
     const onKey = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        finish(isAlert ? undefined : isPrompt ? null : false);
+        e.stopImmediatePropagation();
+        if (e.type === "keydown") finish(isAlert ? undefined : isPrompt ? null : false);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        finish(isPrompt ? inp.value : isAlert ? undefined : true);
+        e.stopImmediatePropagation();
+        if (e.type === "keydown") finish(isPrompt ? inp.value : isAlert ? undefined : true);
       }
     };
     window.addEventListener("keydown", onKey, true);
+    window.addEventListener("keyup", onKey, true);
     $("dlgOk").onclick = () => finish(isPrompt ? inp.value : isAlert ? undefined : true);
     cancel.onclick = () => finish(isPrompt ? null : false);
     box.onclick = (e) => {
@@ -640,15 +649,22 @@ document.addEventListener("click", () => {
 $("btnAdd").onclick = addFolder;
 $("btnAddBig").onclick = addFolder;
 $("btnSaveNow").onclick = async () => {
+  if (Date.now() < swallowEnterUntil) return;
   if (!selectedId) return askOk("先选一个游戏");
+  $("btnSaveNow").blur();
   setBusy(true, "正在保存…");
   try {
     const r = await api().save_now(selectedId);
     if (!r.ok) return askOk(r.error);
     if (r.skipped) return askOk("现在和上一版一样，没有新进度要存");
     await loadGraph();
+    if (graphData && graphData.current_id) {
+      selectedNode = (graphData.nodes || []).find((n) => n.id === graphData.current_id) || null;
+      if (selectedNode) renderGraph(graphData);
+    }
   } finally {
     setBusy(false);
+    $("btnSaveNow").blur();
   }
 };
 $("showAuto").checked = !hideAuto;
