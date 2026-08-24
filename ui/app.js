@@ -110,23 +110,69 @@ function renderLines(g) {
 
 function layout(g) {
   const nodes = (g.nodes || []).slice().sort((a, b) => b.time - a.time);
-  const colOf = {};
-  (g.lines || []).forEach((ln, i) => {
-    let cur = ln.tip;
-    const seen = new Set();
-    const byId = new Map(nodes.map((n) => [n.id, n]));
-    while (cur && !seen.has(cur)) {
-      seen.add(cur);
-      if (colOf[cur] === undefined) colOf[cur] = i;
-      cur = byId.get(cur)?.parents?.[0];
-    }
+  const visible = new Set(nodes.map((n) => n.id));
+  const kids = new Map();
+  nodes.forEach((n) => {
+    const pid = (n.parents || []).find((p) => visible.has(p));
+    if (!pid) return;
+    if (!kids.has(pid)) kids.set(pid, []);
+    kids.get(pid).push(n);
   });
+  const spine = onCurrentLine(g);
+  const rank = (n) => (spine.has(n.id) ? 0 : 1);
+  const sortNodes = (arr) => {
+    arr.sort((a, b) => rank(a) - rank(b) || b.time - a.time);
+  };
+  kids.forEach(sortNodes);
+  const roots = nodes.filter((n) => !(n.parents || []).some((p) => visible.has(p)));
+  sortNodes(roots);
+
+  const widthOf = {};
+  const width = (id) => {
+    if (widthOf[id] != null) return widthOf[id];
+    const cs = kids.get(id) || [];
+    if (!cs.length) return (widthOf[id] = 1);
+    return (widthOf[id] = cs.reduce((s, c) => s + width(c.id), 0));
+  };
+  roots.forEach((r) => width(r.id));
+
+  const colOf = {};
+  const place = (id, left) => {
+    const cs = kids.get(id) || [];
+    if (!cs.length) {
+      colOf[id] = left;
+      return;
+    }
+    let x = left;
+    cs.forEach((c) => {
+      place(c.id, x);
+      x += width(c.id);
+    });
+    colOf[id] = colOf[cs[0].id];
+  };
+  let left = 0;
+  roots.forEach((r) => {
+    place(r.id, left);
+    left += width(r.id);
+  });
+
   const rowOf = {};
   nodes.forEach((n, i) => {
     rowOf[n.id] = i;
     if (colOf[n.id] === undefined) colOf[n.id] = 0;
   });
-  return { nodes, colOf, rowOf, cols: Math.max(1, (g.lines || []).length) };
+  const colVals = Object.values(colOf);
+  const cols = colVals.length ? Math.max(...colVals) + 1 : 1;
+  return { nodes, colOf, rowOf, cols };
+}
+
+function edgePath(x1, y1, x2, y2, curve) {
+  if (x1 === x2) return `M ${x1} ${y1} L ${x2} ${y2}`;
+  if (!curve) return `M ${x1} ${y1} L ${x1} ${y2} L ${x2} ${y2}`;
+  const r = Math.min(12, Math.abs(y2 - y1) / 2, Math.abs(x2 - x1) / 2);
+  if (r < 2) return `M ${x1} ${y1} L ${x1} ${y2} L ${x2} ${y2}`;
+  const sx = x2 > x1 ? 1 : -1;
+  return `M ${x1} ${y1} L ${x1} ${y2 - r} Q ${x1} ${y2} ${x1 + sx * r} ${y2} L ${x2} ${y2}`;
 }
 
 function onCurrentLine(g) {
@@ -265,10 +311,7 @@ function renderGraph(g) {
     (n.parents || []).forEach((p) => {
       if (rowOf[p] === undefined) return;
       const hi = current.has(n.id) && current.has(p);
-      const x1 = x(n.id), y1 = y(n.id), x2 = x(p), y2 = y(p);
-      const d = curveEdges
-        ? `M ${x1} ${y1} C ${x1} ${(y1 + y2) / 2}, ${x2} ${(y1 + y2) / 2}, ${x2} ${y2}`
-        : `M ${x1} ${y1} L ${x1} ${(y1 + y2) / 2} L ${x2} ${(y1 + y2) / 2} L ${x2} ${y2}`;
+      const d = edgePath(x(n.id), y(n.id), x(p), y(p), curveEdges);
       edges += `<path d="${d}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
     });
   });
