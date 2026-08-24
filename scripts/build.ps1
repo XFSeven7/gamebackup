@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $OutDir = Join-Path $Root "dist\gamebackup"
 $Zip = Join-Path $Root "dist\gamebackup-win64.zip"
 if (-not (Test-Path (Join-Path $OutDir "gamebackup.exe"))) {
-    Write-Error "没有生成 gamebackup.exe"
+    Write-Error "missing gamebackup.exe"
     exit 1
 }
 if (Test-Path $Zip) { Remove-Item $Zip -Force }
