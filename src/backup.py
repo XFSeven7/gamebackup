@@ -79,7 +79,7 @@ def restore(root: Path, item: ManagedFolder, commit_id: str, fork: bool) -> None
         if tip:
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             create_line(repo, tip, f"换档前-{stamp}")
-    reset_to(repo, commit_id)
+    reset_to(repo, commit_id, line=fresh.current_line)
     live = Path(fresh.path)
     mirror(repo, live)
     fresh.last_fingerprint = fingerprint(live)

@@ -52,7 +52,12 @@ def _ensure_main(path: Path) -> None:
     if b"refs/heads/master" in repo.refs and b"refs/heads/main" not in repo.refs:
         repo.refs[b"refs/heads/main"] = repo.refs[b"refs/heads/master"]
         del repo.refs[b"refs/heads/master"]
-    if b"refs/heads/main" in repo.refs:
+        try:
+            if repo.refs.follow(b"HEAD")[0] == b"refs/heads/master":
+                repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
+        except Exception:
+            pass
+    if b"HEAD" not in repo.refs and b"refs/heads/main" in repo.refs:
         repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
 
 
@@ -137,8 +142,14 @@ def checkout_line(path: Path, name: str) -> None:
     repo.refs.set_symbolic_ref(b"HEAD", ref)
 
 
-def reset_to(path: Path, commit_id: str) -> None:
+def reset_to(path: Path, commit_id: str, line: str | None = None) -> None:
     porcelain.reset(_p(path), "hard", treeish=commit_id)
+    if not line:
+        return
+    repo = Repo(_p(path))
+    ref = b"refs/heads/" + line.encode("utf-8")
+    repo.refs[ref] = commit_id.encode("ascii")
+    repo.refs.set_symbolic_ref(b"HEAD", ref)
 
 
 def rename_line(path: Path, old: str, new: str) -> None:
@@ -365,12 +376,17 @@ def graph(path: Path, hide_auto: bool, current_line: str) -> dict:
         )
 
     current_id = ""
-    for ln in lines:
-        if ln["name"] == current_line:
-            current_id = ln["tip"]
-            break
-    if not current_id and lines:
-        current_id = lines[0]["tip"]
+    try:
+        current_id = _hex(repo.head())
+    except Exception:
+        current_id = ""
+    if not current_id:
+        for ln in lines:
+            if ln["name"] == current_line:
+                current_id = ln["tip"]
+                break
+        if not current_id and lines:
+            current_id = lines[0]["tip"]
 
     raw = {
         "nodes": nodes,

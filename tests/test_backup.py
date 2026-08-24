@@ -55,7 +55,10 @@ class BackupTest(unittest.TestCase):
             backup_once(root, item)
             restore(root, item, old_id, fork=True)
             self.assertEqual((live / "s.sav").read_bytes(), b"old")
+            from config import find_item as _find
+            item = _find(load(root), item.id) or item
             g = graph(repo, hide_auto=False, current_line=item.current_line)
+            self.assertEqual(g["current_id"], old_id)
             names = [ln["name"] for ln in g["lines"]]
             self.assertTrue(any(n.startswith("换档前-") for n in names))
             # 换档前那条进度应仍能看到 new
