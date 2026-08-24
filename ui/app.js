@@ -426,6 +426,7 @@ async function renameItem(id, old) {
 
 async function restore(fork) {
   if (!selectedId || !selectedNode) return;
+  if (!confirm("切换存档前请先退出游戏，否则可能失败或被游戏改回去。\n\n现在已经退出游戏了吗？")) return;
   const extra = "如果开了 Steam 云存档，Steam 有可能又把存档改回去。";
   if (fork) {
     if (!confirm("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra)) return;
