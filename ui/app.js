@@ -119,7 +119,7 @@ function layout(g) {
     kids.get(pid).push(n);
   });
   const sortNodes = (arr) => {
-    arr.sort((a, b) => b.time - a.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    arr.sort((a, b) => a.time - b.time || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   };
   kids.forEach(sortNodes);
   const roots = nodes.filter((n) => !(n.parents || []).some((p) => visible.has(p)));
@@ -448,6 +448,7 @@ async function restore(fork) {
 
 async function newLine() {
   if (!selectedId || !selectedNode) return;
+  if (!confirm("新建分支会复制这一刻，并切换过去。请先退出游戏。\n\n现在已经退出游戏了吗？")) return;
   const name = prompt("这条分支叫什么？", "新进度");
   if (!name) return;
   const r = await api().create_line(selectedId, selectedNode.id, name);

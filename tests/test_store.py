@@ -9,6 +9,7 @@ from store import (
     commit_auto,
     commit_manual,
     create_line,
+    fork_node,
     graph,
     init_repo,
     put_note,
@@ -44,6 +45,23 @@ class StoreTest(unittest.TestCase):
             hidden_ids = {n["id"] for n in hidden["nodes"]}
             self.assertIn(cid1, hidden_ids)  # 练习线的 tip
             self.assertIn(cid2, hidden_ids)
+
+    def test_fork_node_adds_new_commit(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "repo"
+            init_repo(repo)
+            (repo / "save.dat").write_bytes(b"v1")
+            cid1 = commit_auto(repo)
+            new_id, branch = fork_node(repo, cid1, "支线")
+            self.assertNotEqual(new_id, cid1)
+            g = graph(repo, hide_auto=False, current_line=branch)
+            ids = {n["id"] for n in g["nodes"]}
+            self.assertIn(cid1, ids)
+            self.assertIn(new_id, ids)
+            n = next(x for x in g["nodes"] if x["id"] == new_id)
+            self.assertEqual(n["parents"], [cid1])
+            self.assertFalse(n["auto"])
+            self.assertIn(branch, {ln["name"] for ln in g["lines"]})
 
 
 if __name__ == "__main__":

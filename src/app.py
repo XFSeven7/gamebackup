@@ -12,10 +12,10 @@ from PIL import Image, ImageDraw
 import webview
 import pystray
 
-from backup import add_folder, backup_once, repo_dir, restore
+from backup import add_folder, backup_once, fork_branch, repo_dir, restore
 from config import find_item, load, save
 from scheduler import Scheduler
-from store import add_tag, create_line, delete_line, graph, put_note, rename_line
+from store import add_tag, delete_line, graph, put_note, rename_line
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
 UI = Path(__file__).resolve().parent.parent / "ui" / "index.html"
@@ -105,9 +105,9 @@ class Api:
         it = find_item(cfg, item_id)
         if not it:
             return {"ok": False, "error": "没有找到这份存档"}
-        name = name.strip() or ("进度-" + commit_id[:6])
+        name = name.strip() or ("新进度")
         try:
-            create_line(repo_dir(ROOT, it.id), commit_id, name)
+            fork_branch(ROOT, it, commit_id, name)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}

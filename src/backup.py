@@ -7,7 +7,7 @@ from pathlib import Path
 
 from config import ManagedFolder, find_item, load, new_id, save
 from fingerprint import fingerprint
-from store import commit_auto, create_line, graph, init_repo, reset_to, worktree_has_changes
+from store import commit_auto, create_line, fork_node, graph, init_repo, reset_to, worktree_has_changes
 from sync import mirror
 
 
@@ -86,3 +86,20 @@ def restore(root: Path, item: ManagedFolder, commit_id: str, fork: bool) -> None
     item.last_fingerprint = fresh.last_fingerprint
     item.current_line = fresh.current_line
     _write_item(root, fresh)
+
+
+def fork_branch(root: Path, item: ManagedFolder, commit_id: str, name: str) -> str:
+    """复制选中节点并切换到新分支。"""
+    backup_once(root, item)
+    cfg = load(root)
+    fresh = find_item(cfg, item.id) or item
+    repo = repo_dir(root, fresh.id)
+    _cid, branch = fork_node(repo, commit_id, name)
+    live = Path(fresh.path)
+    mirror(repo, live)
+    fresh.current_line = branch
+    item.current_line = branch
+    fresh.last_fingerprint = fingerprint(live)
+    item.last_fingerprint = fresh.last_fingerprint
+    _write_item(root, fresh)
+    return branch

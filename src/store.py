@@ -87,6 +87,46 @@ def create_line(path: Path, from_id: str, name: str) -> None:
     porcelain.branch_create(_p(path), name, objectish=from_id)
 
 
+def _unique_branch(path: Path, name: str) -> str:
+    repo = Repo(_p(path))
+    base = name
+    n = 2
+    while b"refs/heads/" + name.encode("utf-8") in repo.refs:
+        name = f"{base}-{n}"
+        n += 1
+    return name
+
+
+def fork_node(path: Path, from_id: str, name: str) -> tuple[str, str]:
+    """复制这一版成新节点，建分支并切过去。返回 (commit_id, 分支名)。"""
+    import time
+
+    from dulwich.objectspec import parse_commit
+    from dulwich.objects import Commit
+
+    name = _unique_branch(path, name)
+    repo = Repo(_p(path))
+    parent = parse_commit(repo, from_id.encode("ascii"))
+    now = int(time.time())
+    c = Commit()
+    c.tree = parent.tree
+    c.parents = [parent.id]
+    c.author = AUTHOR
+    c.committer = AUTHOR
+    c.commit_time = now
+    c.author_time = now
+    c.commit_timezone = 0
+    c.author_timezone = 0
+    c.encoding = b"UTF-8"
+    c.message = name.encode("utf-8")
+    repo.object_store.add_object(c)
+    ref = b"refs/heads/" + name.encode("utf-8")
+    repo.refs[ref] = c.id
+    repo.refs.set_symbolic_ref(b"HEAD", ref)
+    porcelain.reset(_p(path), "hard", treeish=_hex(c.id))
+    return _hex(c.id), name
+
+
 def checkout_line(path: Path, name: str) -> None:
     repo = Repo(_p(path))
     ref = b"refs/heads/" + name.encode("utf-8")
