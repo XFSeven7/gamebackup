@@ -126,14 +126,14 @@ function onCurrentLine(g) {
 function renderGraph(g) {
   const { nodes, colOf, rowOf, cols } = layout(g);
   const current = onCurrentLine(g);
-  const W = Math.max(320, cols * 36 + 280);
-  const H = Math.max(200, nodes.length * 42 + 40);
+  const W = Math.max(360, cols * 36 + 320);
+  const H = Math.max(200, nodes.length * 52 + 48);
   const svg = $("graph");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W);
   svg.setAttribute("height", H);
   const x = (id) => 28 + colOf[id] * 36;
-  const y = (id) => 24 + rowOf[id] * 42;
+  const y = (id) => 28 + rowOf[id] * 52;
   let edges = "";
   nodes.forEach((n) => {
     (n.parents || []).forEach((p) => {
@@ -148,12 +148,13 @@ function renderGraph(g) {
     const isCur = n.id === g.current_id;
     const r = n.auto ? 5 : 7;
     const fill = isCur ? "#e6b325" : n.auto ? "#777" : "#3d8bfd";
-    const label = (n.tags && n.tags[0]) || (n.auto ? "" : shortMsg(n.message));
-    const curTxt = isCur ? `<text x="${x(n.id) + 12}" y="${y(n.id) - 12}" fill="#e6b325" font-size="11">当前</text>` : "";
+    const remark = nodeRemark(n);
+    const curTxt = isCur ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 22}" fill="#e6b325" font-size="11">当前</text>` : "";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
       ${curTxt}
-      <text x="${x(n.id) + 14}" y="${y(n.id) + 4}" fill="#ccc" font-size="12">${escapeHtml(label || formatTime(n.time))}</text>
+      <text x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="#ddd" font-size="12">${escapeHtml(remark)}</text>
+      <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="11">${escapeHtml(formatTime(n.time))}</text>
     </g>`;
   });
   svg.innerHTML = edges + dots;
@@ -294,9 +295,21 @@ function formatTime(t) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function nodeRemark(n) {
+  if (n.note) return clip(n.note, 20);
+  if (n.tags && n.tags[0]) return clip(n.tags[0], 20);
+  if (n.auto) return "自动存档";
+  return clip(shortMsg(n.message) || "存档", 20);
+}
+
+function clip(s, n) {
+  s = String(s || "");
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
 function shortMsg(s) {
   s = (s || "").replace(/^\[auto\]\s*/, "");
-  return s.length > 18 ? s.slice(0, 18) + "…" : s;
+  return s;
 }
 
 function escapeHtml(s) {
