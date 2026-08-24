@@ -4,7 +4,8 @@ let items = [];
 let selectedId = null;
 let graphData = null;
 let selectedNode = null;
-let hideAuto = true;
+let hideAuto = localStorage.getItem("gb-auto-notes") === "0";
+let showRemarks = localStorage.getItem("gb-remarks") !== "0";
 let curveEdges = localStorage.getItem("gb-curve") !== "0";
 let cam = { x: 40, y: 40, k: 1 };
 let graphSize = { w: 1, h: 1 };
@@ -202,6 +203,18 @@ function onCurrentLine(g) {
   return set;
 }
 
+function onNodeLine(nodes, nodeId) {
+  const set = new Set();
+  if (!nodeId) return set;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let cur = nodeId;
+  while (cur && !set.has(cur)) {
+    set.add(cur);
+    cur = (byId.get(cur)?.parents || []).find((p) => byId.has(p));
+  }
+  return set;
+}
+
 function applyCam() {
   const world = $("graphWorld");
   const pane = $("graphPane");
@@ -309,11 +322,18 @@ function bindCanvas() {
     fitView();
   };
   $("btnFit").addEventListener("mousedown", (e) => e.stopPropagation());
+  pane.addEventListener("click", () => {
+    if (didPan || spaceDown || !selectedNode || !graphData) return;
+    selectedNode = null;
+    renderGraph(graphData);
+    renderDetail();
+  });
 }
 
 function renderGraph(g) {
   const { nodes, colOf, rowOf, cols } = getLayout(g);
   const current = onCurrentLine(g);
+  const picked = selectedNode ? onNodeLine(nodes, selectedNode.id) : new Set();
   const PAD_TOP = 44;
   const PAD_BOTTOM = 32;
   const PAD_LEFT = 24;
@@ -326,6 +346,7 @@ function renderGraph(g) {
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W);
   svg.setAttribute("height", H);
+  svg.classList.toggle("hide-remarks", !showRemarks);
   svg.setAttribute("overflow", "visible");
   const x = (id) => PAD_LEFT + colOf[id] * COL_W;
   const y = (id) => PAD_TOP + rowOf[id] * ROW_H;
@@ -338,9 +359,12 @@ function renderGraph(g) {
   nodes.forEach((n) => {
     (n.parents || []).forEach((p) => {
       if (rowOf[p] === undefined) return;
+      const onPicked = picked.has(n.id) && picked.has(p);
       const hi = current.has(n.id) && current.has(p);
       const d = edgePath(x(n.id), y(n.id), x(p), y(p), curveEdges);
-      edges += `<path d="${d}" fill="none" stroke="${hi ? "#e6b325" : "#555"}" stroke-width="${hi ? 3 : 1.4}" />`;
+      const stroke = onPicked ? "#3d8bfd" : hi ? "#e6b325" : "#555";
+      const sw = onPicked || hi ? 3 : 1.4;
+      edges += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}" />`;
     });
   });
   startIds = new Set();
@@ -356,21 +380,24 @@ function renderGraph(g) {
     const sel = selectedNode && selectedNode.id === n.id;
     const isCur = n.id === g.current_id;
     const isStart = startIds.has(n.id);
+    const onPicked = picked.has(n.id);
     const r = n.auto ? 5 : 7;
-    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : n.auto ? "#777" : "#3d8bfd";
+    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : onPicked ? "#3d8bfd" : n.auto ? "#777" : "#3d8bfd";
     const remark = isStart ? "起始存档" : nodeRemark(n);
     const badge = isCur ? "正在用" : "";
     const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">${badge}</text>` : "";
-    dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}" id="n-${n.id}" data-id="${n.id}">
-      <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" />
+    const ring = sel ? "#fff" : onPicked ? "#9cc7ff" : "none";
+    dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
+      <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="${sel ? 2.5 : onPicked ? 2 : 0}" />
       ${curTxt}
-      <text x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="#ddd" font-size="12">${escapeHtml(remark)}</text>
+      <text class="remark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="${sel ? 13 : 12}" font-weight="${sel ? 700 : 400}">${escapeHtml(remark)}</text>
       <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="11">${escapeHtml(formatTime(n.time))}</text>
     </g>`;
   });
   svg.innerHTML = edges + dots;
   svg.querySelectorAll("g.node").forEach((el) => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (didPan || spaceDown) return;
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
       renderGraph(g);
@@ -540,9 +567,17 @@ document.addEventListener("click", () => {
 });
 $("btnAdd").onclick = addFolder;
 $("btnAddBig").onclick = addFolder;
+$("showAuto").checked = !hideAuto;
 $("showAuto").onchange = (e) => {
   hideAuto = !e.target.checked;
+  localStorage.setItem("gb-auto-notes", hideAuto ? "0" : "1");
   loadGraph();
+};
+$("showRemarks").checked = showRemarks;
+$("showRemarks").onchange = (e) => {
+  showRemarks = e.target.checked;
+  localStorage.setItem("gb-remarks", showRemarks ? "1" : "0");
+  if (graphData) renderGraph(graphData);
 };
 function syncEdgeButtons() {
   $("btnCurve").classList.toggle("on", curveEdges);
