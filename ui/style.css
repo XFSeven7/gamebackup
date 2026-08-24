@@ -27,12 +27,16 @@ button:hover { background: #3d3d3d; }
 #btnAdd, #btnAddBig, #btnSaveNow { background: var(--accent); border-color: #2d6fd0; color: #fff; }
 main { display: grid; grid-template-columns: 220px 1fr; height: calc(100% - 48px); }
 main.side-off { grid-template-columns: 1fr; }
-aside { border-right: 1px solid var(--line); overflow: auto; padding: 12px; background: var(--panel); }
+aside {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--line); overflow: hidden; padding: 12px; background: var(--panel);
+}
 h2 { font-size: 12px; color: var(--muted); margin: 8px 0; letter-spacing: 0.04em; }
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .side-head h2 { margin: 8px 0; }
 .side-head #btnAdd { padding: 2px 9px; font-size: 16px; line-height: 1.2; }
 ul { list-style: none; margin: 0; padding: 0; }
+#itemList { flex: 1; overflow: auto; min-height: 0; }
 li.item, li.line {
   padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
 }
@@ -41,8 +45,9 @@ li.item.active, li.line.active { background: #2a3f5f; }
 li.item .sub { color: var(--muted); font-size: 11px; word-break: break-all; }
 li.item .size { color: #d0d0d0; font-size: 12px; margin-top: 2px; }
 .side-total {
-  margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line);
-  font-size: 12px; color: var(--muted);
+  flex-shrink: 0; margin-top: auto; padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--text);
 }
 li.missing { outline: 1px solid var(--warn); }
 li.line.current { font-weight: 700; color: var(--current); }
@@ -67,7 +72,7 @@ li.line.current { font-weight: 700; color: var(--current); }
   background: #2d2d2d; color: var(--text); padding: 4px 10px;
 }
 #empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
-#empty[hidden], #graphWrap[hidden], #menu[hidden], #btnFit[hidden], #dlg[hidden], #dlgInput[hidden], #busy[hidden], #side[hidden] { display: none !important; }
+#empty[hidden], #graphWrap[hidden], #menu[hidden], #btnFit[hidden], #dlg[hidden], #dlgInput[hidden], #busy[hidden], #side[hidden], #sideTotal[hidden] { display: none !important; }
 #btnAddBig { font-size: 16px; padding: 10px 18px; }
 .node { cursor: pointer; }
 .node.auto { opacity: 0.45; }

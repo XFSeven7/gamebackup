@@ -124,7 +124,7 @@ async function refreshItems() {
   if (totalEl) {
     const total = items.reduce((s, it) => s + (Number(it.size_bytes) || 0), 0);
     totalEl.hidden = items.length === 0;
-    totalEl.textContent = items.length ? "全部占用 " + formatBytes(total) : "";
+    totalEl.textContent = items.length ? "总占用 " + formatBytes(total) : "";
   }
   $("empty").hidden = items.length > 0 && !!selectedId;
   if (!selectedId && items[0]) selectItem(items[0].id);
