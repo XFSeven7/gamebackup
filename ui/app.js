@@ -497,13 +497,12 @@ function renderGraph(g) {
     const isStart = startIds.has(n.id);
     const onPicked = picked.has(n.id);
     const r = n.auto ? 5 : 7;
-    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : onPicked ? "#3d8bfd" : n.auto ? "#777" : "#3d8bfd";
+    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : "#777";
     const remark = isStart ? "起始存档" : nodeRemark(n);
     const badge = isCur ? "正在用" : "";
     const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="11">${badge}</text>` : "";
-    const ring = sel ? "#fff" : onPicked ? "#9cc7ff" : "none";
     dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
-      <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="${sel ? 2.5 : onPicked ? 2 : 0}" />
+      <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" stroke-width="${sel ? 2.5 : 0}" />
       ${curTxt}
       <text class="remark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="${sel ? 13 : 12}" font-weight="${sel ? 700 : 400}">${escapeHtml(remark)}</text>
       <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="11">${escapeHtml(formatTime(n.time))}</text>
