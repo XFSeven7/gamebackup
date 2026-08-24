@@ -198,7 +198,7 @@ def main() -> None:
             webview.windows[0].show()
             webview.windows[0].restore()
         else:
-    webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
+            webview.create_window("存档备份", str(UI), js_api=api, width=1100, height=720)
 
     def quit_app(icon, _item):
         scheduler.stop()
