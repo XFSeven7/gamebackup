@@ -68,6 +68,21 @@ def commit_manual(path: Path, message: str) -> str:
     return _commit(path, message)
 
 
+def worktree_has_changes(path: Path) -> bool:
+    """工作区和上一版是否真有文件差别（不是只改了时间）。"""
+    repo_path = _p(path)
+    porcelain.add(repo_path, ["."])
+    st = porcelain.status(repo_path)
+    staged = st.staged
+    if isinstance(staged, dict) and any(staged.values()):
+        return True
+    if st.unstaged:
+        return True
+    if st.untracked:
+        return True
+    return False
+
+
 def create_line(path: Path, from_id: str, name: str) -> None:
     porcelain.branch_create(_p(path), name, objectish=from_id)
 

@@ -15,6 +15,16 @@ class FingerprintTest(unittest.TestCase):
             (p / "a.sav").write_bytes(b"abc")
             self.assertEqual(fingerprint(p), fingerprint(p))
 
+    def test_mtime_only_same_hash(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            f = p / "a.sav"
+            f.write_bytes(b"abc")
+            h1 = fingerprint(p)
+            time.sleep(0.05)
+            f.write_bytes(b"abc")
+            self.assertEqual(h1, fingerprint(p))
+
     def test_content_change_changes_hash(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)

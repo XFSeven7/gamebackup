@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from backup import add_folder, restore
+from backup import add_folder, backup_once, restore
 from config import load
 from store import graph
 
@@ -27,6 +27,17 @@ class BackupTest(unittest.TestCase):
             self.assertEqual((a / "s.sav").read_bytes(), b"A")
             self.assertEqual((b / "s.sav").read_bytes(), b"B")
             self.assertNotEqual(ia.id, ib.id)
+
+    def test_no_change_skips_backup(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "data"
+            live = Path(d) / "save"
+            live.mkdir()
+            (live / "s.sav").write_bytes(b"same")
+            item = add_folder(root, live, "测试")
+            r = backup_once(root, item)
+            self.assertTrue(r["skipped"])
+            self.assertEqual(r["reason"], "unchanged")
 
     def test_fork_restore_keeps_current_on_new_line(self):
         with tempfile.TemporaryDirectory() as d:

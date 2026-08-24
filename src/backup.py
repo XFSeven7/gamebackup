@@ -7,7 +7,7 @@ from pathlib import Path
 
 from config import ManagedFolder, find_item, load, new_id, save
 from fingerprint import fingerprint
-from store import commit_auto, create_line, graph, init_repo, reset_to
+from store import commit_auto, create_line, graph, init_repo, reset_to, worktree_has_changes
 from sync import mirror
 
 
@@ -56,6 +56,10 @@ def backup_once(root: Path, item: ManagedFolder) -> dict:
     repo = repo_dir(root, item.id)
     try:
         mirror(live, repo)
+        if not worktree_has_changes(repo):
+            item.last_fingerprint = fp
+            _write_item(root, item)
+            return {"skipped": True, "reason": "unchanged"}
         commit_auto(repo)
         item.last_fingerprint = fp
         _write_item(root, item)
