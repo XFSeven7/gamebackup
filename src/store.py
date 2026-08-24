@@ -86,6 +86,32 @@ def reset_to(path: Path, commit_id: str) -> None:
     porcelain.reset(_p(path), "hard", treeish=commit_id)
 
 
+def rename_line(path: Path, old: str, new: str) -> None:
+    repo = Repo(_p(path))
+    old_ref = b"refs/heads/" + old.encode("utf-8")
+    new_ref = b"refs/heads/" + new.encode("utf-8")
+    if old_ref not in repo.refs:
+        raise KeyError(old)
+    repo.refs[new_ref] = repo.refs[old_ref]
+    try:
+        head_target = repo.refs.follow(b"HEAD")[0]
+        if head_target == old_ref:
+            repo.refs.set_symbolic_ref(b"HEAD", new_ref)
+    except Exception:
+        pass
+    del repo.refs[old_ref]
+
+
+def delete_line(path: Path, name: str) -> None:
+    if name == "main":
+        raise ValueError("不能删除主线")
+    repo = Repo(_p(path))
+    ref = b"refs/heads/" + name.encode("utf-8")
+    if ref not in repo.refs:
+        raise KeyError(name)
+    del repo.refs[ref]
+
+
 def put_note(path: Path, commit_id: str, text: str) -> None:
     porcelain.notes_add(_p(path), _sha_bytes(commit_id), text.encode("utf-8"))
 

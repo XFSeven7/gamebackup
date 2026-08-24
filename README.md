@@ -11,6 +11,13 @@
 - 回档默认另开一条线，当前进度不会丢
 - 自动备份节点可隐藏，当前线高亮
 
-Windows 桌面应用（Tauri），安装包约 10MB 级。
+Windows 桌面应用（Python + 系统 WebView2）。开发时：
+
+```text
+python -m pip install -r requirements.txt
+python run.py
+```
+
+备份数据默认在 `%LOCALAPPDATA%\gamebackup`。
 
 设计文档：`docs/superpowers/specs/2026-08-24-gamebackup-design.md`

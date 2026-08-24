@@ -1,0 +1,54 @@
+:root {
+  --bg: #1c1c1c;
+  --panel: #252526;
+  --line: #3c3c3c;
+  --text: #e6e6e6;
+  --muted: #9a9a9a;
+  --accent: #3d8bfd;
+  --warn: #c45454;
+  --current: #e6b325;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", "Microsoft YaHei", sans-serif; }
+header {
+  height: 48px; display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; margin-right: auto; }
+.toggle { color: var(--muted); user-select: none; }
+button {
+  background: #333; color: var(--text); border: 1px solid #444;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+button:hover { background: #3d3d3d; }
+#btnAdd, #btnAddBig, #btnRestore { background: var(--accent); border-color: #2d6fd0; color: #fff; }
+main { display: grid; grid-template-columns: 220px 1fr 240px; height: calc(100% - 48px); }
+aside { border-right: 1px solid var(--line); overflow: auto; padding: 12px; background: var(--panel); }
+aside.detail { border-right: none; border-left: 1px solid var(--line); }
+h2 { font-size: 12px; color: var(--muted); margin: 8px 0; letter-spacing: 0.04em; }
+ul { list-style: none; margin: 0; padding: 0; }
+li.item, li.line {
+  padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
+}
+li.item:hover, li.line:hover { background: #333; }
+li.item.active, li.line.active { background: #2a3f5f; }
+li.item .sub { color: var(--muted); font-size: 11px; word-break: break-all; }
+li.missing { outline: 1px solid var(--warn); }
+li.line.current { font-weight: 700; color: var(--current); }
+#graphPane { position: relative; overflow: auto; }
+#empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
+#empty[hidden], #graphWrap[hidden], #detailBody[hidden], #menu[hidden] { display: none !important; }
+#btnAddBig { font-size: 16px; padding: 10px 18px; }
+svg { min-width: 100%; }
+.node { cursor: pointer; }
+.node.auto { opacity: 0.45; }
+.node.selected circle { stroke: #fff; stroke-width: 2.5; }
+#menu {
+  position: fixed; z-index: 20; background: #2b2b2b; border: 1px solid #555;
+  border-radius: 6px; padding: 4px; min-width: 160px;
+}
+#menu li { padding: 6px 10px; cursor: pointer; border-radius: 4px; }
+#menu li:hover { background: #3d8bfd; }
+.btns { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.detail p { margin: 6px 0; color: var(--muted); }
+.detail b { color: var(--text); }
