@@ -15,6 +15,31 @@ def repo_dir(root: Path, item_id: str) -> Path:
     return Path(root) / "repos" / item_id
 
 
+def dir_nbytes(path: Path) -> int:
+    path = Path(path)
+    if not path.is_dir():
+        return 0
+    total = 0
+    for p in path.rglob("*"):
+        try:
+            if p.is_file() and not p.is_symlink():
+                total += p.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def format_bytes(n: int) -> str:
+    n = max(0, int(n))
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    if n < 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    return f"{n / (1024 * 1024 * 1024):.1f} GB"
+
+
 def _write_item(root: Path, item: ManagedFolder) -> None:
     cfg = load(root)
     for i, it in enumerate(cfg.items):

@@ -92,6 +92,14 @@ function onReady(fn) {
   else window.addEventListener("pywebviewready", fn);
 }
 
+function formatBytes(n) {
+  n = Math.max(0, Number(n) || 0);
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+  return (n / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+}
+
 async function refreshItems() {
   items = await api().list_items();
   const ul = $("itemList");
@@ -99,7 +107,9 @@ async function refreshItems() {
   items.forEach((it) => {
     const li = document.createElement("li");
     li.className = "item" + (it.id === selectedId ? " active" : "") + (it.available ? "" : " missing");
-    li.innerHTML = `<div>${escapeHtml(it.name)}</div><div class="sub">${escapeHtml(it.available ? it.path_short : "找不到这个文件夹了")}</div>`;
+    const size = it.size_text || formatBytes(it.size_bytes);
+    const sub = it.available ? it.path_short : "找不到这个文件夹了";
+    li.innerHTML = `<div>${escapeHtml(it.name)}</div><div class="size">占用 ${escapeHtml(size)}</div><div class="sub">${escapeHtml(sub)}</div>`;
     li.onclick = () => selectItem(it.id);
     li.oncontextmenu = (e) => {
       e.preventDefault();
@@ -110,6 +120,12 @@ async function refreshItems() {
     };
     ul.appendChild(li);
   });
+  const totalEl = $("sideTotal");
+  if (totalEl) {
+    const total = items.reduce((s, it) => s + (Number(it.size_bytes) || 0), 0);
+    totalEl.hidden = items.length === 0;
+    totalEl.textContent = items.length ? "全部占用 " + formatBytes(total) : "";
+  }
   $("empty").hidden = items.length > 0 && !!selectedId;
   if (!selectedId && items[0]) selectItem(items[0].id);
   else if (items.length === 0) {
@@ -725,6 +741,7 @@ async function pullGraphIfChanged() {
   const r = await api().graph_rev();
   if (r.rev === graphRev) return;
   graphRev = r.rev;
+  await refreshItems();
   await loadGraph();
 }
 

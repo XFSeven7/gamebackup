@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from backup import add_folder, backup_once, restore, save_now
+from backup import add_folder, backup_once, dir_nbytes, format_bytes, restore, save_now
 from config import load
 from store import graph
 
@@ -85,6 +85,24 @@ class BackupTest(unittest.TestCase):
             pre = next(n for n in names if n.startswith("换档前-"))
             checkout_line(repo, pre)
             self.assertEqual((repo / "s.sav").read_bytes(), b"new")
+
+
+class SizeTextTest(unittest.TestCase):
+    def test_format_bytes(self):
+        self.assertEqual(format_bytes(0), "0 B")
+        self.assertEqual(format_bytes(500), "500 B")
+        self.assertEqual(format_bytes(2048), "2.0 KB")
+        self.assertEqual(format_bytes(5 * 1024 * 1024), "5.0 MB")
+        self.assertEqual(format_bytes(2 * 1024 * 1024 * 1024), "2.0 GB")
+
+    def test_dir_nbytes(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p / "a.bin").write_bytes(b"x" * 100)
+            (p / "sub").mkdir()
+            (p / "sub" / "b.bin").write_bytes(b"y" * 50)
+            self.assertEqual(dir_nbytes(p), 150)
+            self.assertEqual(dir_nbytes(p / "missing"), 0)
 
 
 if __name__ == "__main__":

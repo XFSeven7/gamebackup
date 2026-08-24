@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 import webview
 import pystray
 
-from backup import add_folder, backup_once, fork_branch, repo_dir, restore, save_now as do_save_now
+from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from scheduler import Scheduler
@@ -51,6 +51,9 @@ class Api:
             row = asdict(it)
             row["available"] = Path(it.path).is_dir()
             row["path_short"] = _short_path(it.path)
+            nbytes = dir_nbytes(repo_dir(ROOT, it.id))
+            row["size_bytes"] = nbytes
+            row["size_text"] = format_bytes(nbytes)
             out.append(row)
         return out
 
