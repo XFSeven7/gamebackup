@@ -386,12 +386,10 @@ function renderGraph(g) {
       renderGraph(g);
       renderDetail();
       const acts = [
-        { label: "切换到这一刻（保留当前进度）", run: () => restore(true) },
-        { label: "不保留当前进度，直接切换", run: () => restore(false) },
-        { label: "从这一刻另存一条进度", run: newLine },
-        { label: "给这一刻起名", run: tagNode },
+        { label: "切换到当前进度", run: () => restore(true) },
+        { label: "新建分支", run: newLine },
       ];
-      if (!startIds.has(el.dataset.id)) acts.push({ label: "写备注", run: noteNode });
+      if (!startIds.has(el.dataset.id)) acts.push({ label: "备注", run: noteNode });
       showMenu(e.clientX, e.clientY, acts);
     });
   });
@@ -450,7 +448,7 @@ async function restore(fork) {
 
 async function newLine() {
   if (!selectedId || !selectedNode) return;
-  const name = prompt("这条进度叫什么？", "新进度");
+  const name = prompt("这条分支叫什么？", "新进度");
   if (!name) return;
   const r = await api().create_line(selectedId, selectedNode.id, name);
   if (!r.ok) return alert(r.error);
