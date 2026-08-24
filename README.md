@@ -20,4 +20,12 @@ python run.py
 
 备份数据默认在 `%LOCALAPPDATA%\gamebackup`。
 
+打包绿色 zip（Windows）：
+
+```text
+powershell -File scripts/build.ps1
+```
+
+产物在 `dist/gamebackup-win64.zip`。解压后双击 `gamebackup.exe`。
+
 设计文档：`docs/superpowers/specs/2026-08-24-gamebackup-design.md`
