@@ -310,8 +310,8 @@ function renderGraph(g) {
       renderGraph(g);
       renderDetail();
       const acts = [
-        { label: "回到这一刻（先留着现在的进度）", run: () => restore(true) },
-        { label: "直接换成这一刻", run: () => restore(false) },
+        { label: "切换到这一刻（保留当前进度）", run: () => restore(true) },
+        { label: "不保留当前进度，直接切换", run: () => restore(false) },
         { label: "从这一刻另存一条进度", run: newLine },
         { label: "给这一刻起名", run: tagNode },
       ];
@@ -364,8 +364,8 @@ async function restore(fork) {
   if (!selectedId || !selectedNode) return;
   const extra = "如果开了 Steam 云存档，Steam 有可能又把存档改回去。";
   if (fork) {
-    if (!confirm("先把你现在的进度另外存一份，再把游戏换成刚才点的那一版。\n" + extra)) return;
-  } else if (!confirm("直接把游戏换成这一版，现在的进度会没有。\n" + extra)) return;
+    if (!confirm("会先把你现在的进度另外存一份，再切换到这一刻。\n" + extra)) return;
+  } else if (!confirm("不保留当前进度，游戏会直接切换到这一刻。\n" + extra)) return;
   const r = await api().restore(selectedId, selectedNode.id, fork);
   if (!r.ok) return alert(r.error);
   await loadGraph();
