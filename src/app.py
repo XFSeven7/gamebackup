@@ -19,7 +19,10 @@ from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from scheduler import Scheduler
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
-ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
+# ponytail: GAMEBACKUP_ROOT 方便演示/截图，不碰用户真实数据。
+ROOT = Path(os.environ["GAMEBACKUP_ROOT"]) if os.environ.get("GAMEBACKUP_ROOT") else (
+    Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
+)
 UI = ui_index()
 APP_TITLE = "存档助手 v1.0.0"
 

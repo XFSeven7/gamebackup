@@ -1,31 +1,62 @@
-# gamebackup
+# 存档助手
 
-给普通玩家用的游戏存档备份工具。
+给普通玩家用的游戏存档备份工具。选好存档文件夹之后，它会在后台悄悄记住每一版；主界面用树形图看进度、回档、开新线——不用会 Git。
 
-手动选择存档文件夹，可同时管理多份；后台按分钟备份（没改动就跳过）。用隐藏 git 仓库保存历史，主界面用树形图查看存档线、回档、开新线。
+![主界面：多游戏 + 存档树](docs/images/main.png)
 
-## 目标
+## 能做什么
 
-- 打开就能用：选文件夹即进入管理，可起显示名
-- 托盘常驻，不要求安装 Git / .NET / Node
-- 回档默认另开一条线，当前进度不会丢
-- 自动备份节点可隐藏，当前线高亮
+- **多游戏管理**：左边列出你在管的存档，各自占用空间一目了然
+- **自动备份**：按固定间隔检测改动，没改就跳过
+- **树形进度**：分叉、标签、备注都能看见；当前进度高亮
+- **安全回档**：默认另开一条线，当前进度不会被盖掉
+- **托盘常驻**：关掉窗口也还在备份；可一键暂停
 
-Windows 桌面应用（Python + 系统 WebView2）。开发时：
+![首次使用：选择存档文件夹](docs/images/empty.png)
 
-```text
+## 怎么用
+
+1. 打开应用，点 **选择游戏存档**（或左侧 `+`）
+2. 选中游戏真正的存档文件夹，起个好认的名字
+3. 之后正常玩游戏即可；重要节点可点 **立即保存**，或右键节点打标签 / 写备注
+4. 想试另一条路线：从某个节点 **开新线**；想回去：双击或右键恢复（默认保留当前线）
+
+备份数据默认在 `%LOCALAPPDATA%\gamebackup`。游戏原目录只做同步，不会被写成 Git 仓库。
+
+## 运行（开发）
+
+需要 Windows 10/11，并已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)。
+
+```powershell
 python -m pip install -r requirements.txt
 python run.py
 ```
 
-备份数据默认在 `%LOCALAPPDATA%\gamebackup`。
+可选：用独立数据目录跑演示，不碰你自己的备份：
 
-打包绿色 zip（Windows）：
+```powershell
+$env:GAMEBACKUP_ROOT = "$PWD\docs\_demo_root"
+python run.py
+```
 
-```text
+## 打包
+
+```powershell
 powershell -File scripts/build.ps1
 ```
 
-产物在 `dist/gamebackup-win64.zip`。解压后双击 `gamebackup.exe`。
+产物：`dist/gamebackup-win64.zip`。解压后双击 `gamebackup.exe`。
 
-设计文档：`docs/superpowers/specs/2026-08-24-gamebackup-design.md`
+## 重新生成 README 截图
+
+```powershell
+python scripts/seed_readme_demo.py
+python docs/readme-demo/serve.py
+# 浏览器打开 http://127.0.0.1:8765/ 与 ?empty=1 截图
+```
+
+## 说明
+
+- 界面用语面向玩家（存档线 / 恢复 / 标签），不出现 commit、checkout 等词
+- 第一版不做 Steam 自动扫库、云同步
+- 设计文档：`docs/superpowers/specs/2026-08-24-gamebackup-design.md`

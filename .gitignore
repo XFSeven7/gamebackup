@@ -15,4 +15,6 @@ __pycache__/
 venv/
 dist/
 build/
+docs/_demo_root/
+docs/_demo_tmp/
 *.egg-info/
