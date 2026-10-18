@@ -21,7 +21,7 @@ from store import add_tag, branch_exists, delete_line, delete_node as drop_node,
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
 UI = ui_index()
-APP_TITLE = "浪子宇的存档助手 v1.0.0"
+APP_TITLE = "存档助手 v1.0.0"
 
 
 def _icon_image() -> Image.Image:
