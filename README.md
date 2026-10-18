@@ -2,6 +2,15 @@
 
 给普通玩家用的游戏存档备份工具。选好存档文件夹之后，它会在后台悄悄记住每一版；主界面用树形图看进度、回档、开新线。
 
+## 下载
+
+**[点击下载 Windows 版（最新）](https://github.com/XFSeven7/gamebackup/releases/latest/download/gamebackup-win64.zip)**
+
+解压后双击 `start.bat`（推荐），或直接运行 `gamebackup.exe`。  
+若提示被拦截：右键 zip / 文件夹 → 属性 → 勾选「解除锁定」。需要 Windows 10/11，并已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)（一般自带）。
+
+历史版本见 [Releases](https://github.com/XFSeven7/gamebackup/releases)。
+
 ![主界面：多游戏 + 存档树](docs/images/main.png)
 
 ## 能做什么
@@ -45,9 +54,7 @@ python run.py
 powershell -File scripts/build.ps1
 ```
 
-产物：`dist/gamebackup-win64.zip`。解压后双击 `gamebackup.exe`。
-
-若从浏览器下载后打不开，先双击同目录里的 `start.bat`（会解除 Windows 对下载文件的拦截），或右键 zip / 文件夹 → 属性 → 勾选「解除锁定」。
+产物：`dist/gamebackup-win64.zip`。
 
 ## 重新生成 README 截图
 
