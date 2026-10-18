@@ -21,8 +21,8 @@ if (-not (Test-Path (Join-Path $OutDir "gamebackup.exe"))) {
     Write-Error "missing gamebackup.exe"
     exit 1
 }
-# 解压后若仍被拦截，可双击这个再启动
-$Launcher = Join-Path $OutDir "先点我启动.bat"
+# 解压后若仍被拦截，可双击这个再启动（文件名只用 ASCII，避免 zip 中文乱码）
+$Launcher = Join-Path $OutDir "start.bat"
 @(
     '@echo off'
     'cd /d "%~dp0"'

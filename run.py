@@ -55,7 +55,7 @@ try:
     from app import main
 except Exception as e:
     _die(
-        "启动失败。若文件是从浏览器下载的，请先双击同目录「先点我启动.bat」，"
+        "启动失败。若文件是从浏览器下载的，请先双击同目录 start.bat，"
         f"或右键文件夹 → 属性 → 解除锁定。\n\n{e}"
     )
 

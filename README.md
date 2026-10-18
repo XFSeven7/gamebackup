@@ -47,7 +47,7 @@ powershell -File scripts/build.ps1
 
 产物：`dist/gamebackup-win64.zip`。解压后双击 `gamebackup.exe`。
 
-若从浏览器下载后打不开，先双击同目录里的 `先点我启动.bat`（会解除 Windows 对下载文件的拦截），或右键 zip / 文件夹 → 属性 → 勾选「解除锁定」。
+若从浏览器下载后打不开，先双击同目录里的 `start.bat`（会解除 Windows 对下载文件的拦截），或右键 zip / 文件夹 → 属性 → 勾选「解除锁定」。
 
 ## 重新生成 README 截图
 
