@@ -608,7 +608,9 @@ async function addFolder(game) {
   if (addingFolder) return;
   addingFolder = true;
   try {
-    const path = await api().pick_folder(game?.save_path || "");
+    const path = game?.save_path
+      ? (await askText(`确认「${game.name}」的存档文件夹`, game.save_path))?.trim()
+      : await api().pick_folder();
     if (!path) return;
     const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
     const name = game?.name || await askText("给这个游戏起个名字，方便以后找", base);

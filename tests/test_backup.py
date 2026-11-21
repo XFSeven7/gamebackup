@@ -11,6 +11,19 @@ from store import graph
 
 
 class BackupTest(unittest.TestCase):
+    def test_steam_folder_conflict_identifies_the_existing_game(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "data"
+            saves = Path(d) / "saves"
+            saves.mkdir()
+            (saves / "game.sav").write_bytes(b"progress")
+            original = add_folder(root, saves, "Already tracked", steam_app_id="100")
+
+            with self.assertRaisesRegex(ValueError, "Already tracked"):
+                add_folder(root, saves, "Another game", steam_app_id="200")
+
+            self.assertEqual(load(root).items, [original])
+
     def test_steam_shortcut_links_existing_backup_and_reuses_it_by_app_id(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "data"

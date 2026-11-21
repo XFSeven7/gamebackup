@@ -64,7 +64,7 @@ def add_folder(root: Path, live_path: Path, name: str, steam_app_id: str = "") -
         for it in cfg.items:
             if Path(it.path) == live_path:
                 if it.steam_app_id:
-                    raise ValueError("这个存档文件夹已关联到另一个 Steam 游戏")
+                    raise ValueError(f"这个目录已由「{it.name}」跟踪，请为「{name}」选择自己的存档目录。")
                 it.steam_app_id = steam_app_id
                 save(root, cfg)
                 return it
