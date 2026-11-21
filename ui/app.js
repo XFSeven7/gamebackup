@@ -564,11 +564,40 @@ function renderGraph(g) {
   });
 }
 
-async function addFolder() {
-  const path = await api().pick_folder();
+async function scanSteamGames() {
+  const button = $("btnScanSteam");
+  const status = $("steamScanStatus");
+  const list = $("steamGameList");
+  button.disabled = true;
+  status.hidden = false;
+  status.textContent = "正在扫描…";
+  try {
+    const games = await api().scan_steam_games();
+    list.replaceChildren();
+    for (const game of games) {
+      const row = document.createElement("li");
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.textContent = game.name;
+      pick.title = "选择存档文件夹 · " + game.path;
+      pick.onclick = () => addFolder(game);
+      row.appendChild(pick);
+      list.appendChild(row);
+    }
+    status.hidden = games.length > 0;
+    status.textContent = games.length ? "" : "没找到已安装的 Steam 游戏";
+  } catch (e) {
+    status.textContent = "Steam 扫描失败，可点刷新重试";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function addFolder(game) {
+  const path = await api().pick_folder(game?.path || "");
   if (!path) return;
   const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
-  const name = await askText("给这个游戏起个名字，方便以后找", base);
+  const name = await askText("给这个游戏起个名字，方便以后找", game?.name || base);
   if (name === null) return;
   const r = await api().add_folder(path, name);
   if (!r.ok) return askOk(r.error);
@@ -711,8 +740,9 @@ function escapeHtml(s) {
 document.addEventListener("click", () => {
   $("menu").hidden = true;
 });
-$("btnAdd").onclick = addFolder;
-$("btnAddBig").onclick = addFolder;
+$("btnAdd").onclick = () => addFolder();
+$("btnAddBig").onclick = () => addFolder();
+$("btnScanSteam").onclick = scanSteamGames;
 $("btnSaveNow").onclick = async () => {
   if (Date.now() < swallowEnterUntil) return;
   if (!selectedId) return askOk("先选一个游戏");
@@ -785,6 +815,7 @@ async function pullGraphIfChanged() {
 
 onReady(async () => {
   bindCanvas();
+  scanSteamGames();
   await refreshItems();
   if (selectedId) await loadGraph();
   try {

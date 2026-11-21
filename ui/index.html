@@ -23,13 +23,21 @@
         <h2>我的游戏</h2>
         <button type="button" id="btnAdd" title="添加游戏存档">+</button>
       </div>
-      <ul id="itemList"></ul>
+      <div class="side-lists">
+        <ul id="itemList"></ul>
+        <div class="side-head steam-head">
+          <h2>已安装的 Steam 游戏</h2>
+          <button type="button" id="btnScanSteam">刷新</button>
+        </div>
+        <p id="steamScanStatus" role="status">正在扫描…</p>
+        <ul id="steamGameList"></ul>
+      </div>
       <div id="sideTotal" class="side-total" hidden></div>
     </aside>
     <section id="graphPane">
       <button type="button" id="btnSide" title="隐藏游戏列表">‹</button>
       <div id="empty">
-        <p>选一个游戏存档所在的文件夹，之后会自动帮你记住每一版。</p>
+        <p>从左侧选择 Steam 游戏，或手动添加。选好存档文件夹后即开始备份。</p>
         <button type="button" id="btnAddBig">选择游戏存档</button>
       </div>
       <div id="graphWrap" hidden>

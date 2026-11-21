@@ -36,7 +36,15 @@ h2 { font-size: 12px; color: var(--muted); margin: 8px 0; letter-spacing: 0.04em
 .side-head h2 { margin: 8px 0; }
 .side-head #btnAdd { padding: 2px 9px; font-size: 16px; line-height: 1.2; }
 ul { list-style: none; margin: 0; padding: 0; }
-#itemList { flex: 1; overflow: auto; min-height: 0; }
+.side-lists { flex: 1; overflow: auto; min-height: 0; }
+.steam-head { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 4px; }
+#btnScanSteam { font-size: 12px; padding: 2px 6px; flex-shrink: 0; }
+#steamScanStatus { color: var(--muted); font-size: 12px; margin: 8px 0; }
+#steamGameList button {
+  width: 100%; padding: 8px 10px; margin-bottom: 4px;
+  background: transparent; border: 0; text-align: left; overflow-wrap: anywhere;
+}
+#steamGameList button:hover { background: #333; }
 li.item, li.line {
   padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
 }

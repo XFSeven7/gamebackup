@@ -17,6 +17,7 @@ from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_byte
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from scheduler import Scheduler
+from steam import scan_installed_games
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
 # ponytail: GAMEBACKUP_ROOT 方便演示/截图，不碰用户真实数据。
@@ -60,11 +61,14 @@ class Api:
             out.append(row)
         return out
 
-    def pick_folder(self) -> str:
+    def scan_steam_games(self) -> list[dict[str, str]]:
+        return scan_installed_games()
+
+    def pick_folder(self, directory: str = "") -> str:
         wins = webview.windows
         if not wins:
             return ""
-        result = wins[0].create_file_dialog(webview.FOLDER_DIALOG)
+        result = wins[0].create_file_dialog(webview.FOLDER_DIALOG, directory=directory)
         if not result:
             return ""
         return str(result[0])
