@@ -34,6 +34,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="gamebackup",
+    icon=str(root / "ui" / "gamebackup.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<mask id="save-branch">
+  <path fill="#fff" d="M19 13h26c7 0 12 5 14 12l3 13c2 8-3 14-10 14-4 0-7-3-10-6l-2-2a8 8 0 0 0-6-2h-4a8 8 0 0 0-6 2l-2 2c-3 3-6 6-10 6-7 0-12-6-10-14l3-13c2-7 7-12 14-12Z"/>
+  <path d="M-2 33H49M25 33V22H42" fill="none" stroke="#000" stroke-width="3.4" stroke-linecap="round"/>
+  <g fill="#000">
+    <circle cx="49" cy="33" r="3.4"/>
+    <circle cx="42" cy="22" r="3.4"/>
+  </g>
+</mask>
+<defs>
+  <linearGradient id="steam-blue" gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="13" y2="52">
+    <stop offset="0%" stop-color="#141c37"/>
+    <stop offset="100%" stop-color="#04699d"/>
+  </linearGradient>
+</defs>
+<rect width="64" height="64" fill="url(#steam-blue)" mask="url(#save-branch)"/>
+</svg>
