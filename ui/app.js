@@ -6,6 +6,11 @@ let addingFolder = false;
 let selectedId = null;
 let graphData = null;
 let selectedNode = null;
+let graphLoadId = 0;
+let summaryKey = "";
+let summaryLoadId = 0;
+let summarySlots = [];
+let summarySlotIndex = null;
 let hideAuto = localStorage.getItem("gb-auto-notes") === "0";
 let showRemarks = localStorage.getItem("gb-remarks") !== "0";
 let curveEdges = localStorage.getItem("gb-curve") !== "0";
@@ -153,6 +158,7 @@ async function refreshItems() {
   if (!selectedId && items[0]) selectItem(items[0].id);
   else if (items.length === 0) {
     selectedId = null;
+    hideSaveSummary();
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
@@ -160,6 +166,13 @@ async function refreshItems() {
 }
 
 async function selectItem(id) {
+  if (selectedId !== id) {
+    hideSaveSummary();
+    summarySlotIndex = null;
+    graphData = null;
+    $("graphWrap").hidden = true;
+    $("btnFit").hidden = true;
+  }
   selectedId = id;
   selectedNode = null;
   await refreshItems();
@@ -168,8 +181,12 @@ async function selectItem(id) {
 
 async function loadGraph() {
   if (!selectedId) return;
-  const g = await api().graph(selectedId, hideAuto);
+  const itemId = selectedId;
+  const request = ++graphLoadId;
+  const g = await api().graph(itemId, hideAuto);
+  if (request !== graphLoadId || itemId !== selectedId) return;
   if (!g.ok) {
+    hideSaveSummary();
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
@@ -187,6 +204,107 @@ async function loadGraph() {
     lastFitItem = selectedId;
     fitView();
   }
+}
+
+function hideSaveSummary() {
+  $("saveSummary").hidden = true;
+  summaryKey = "";
+  summaryLoadId++;
+}
+
+function showSaveSummaryMessage(message, retry = false) {
+  $("saveSummaryStatus").textContent = message;
+  $("saveSummaryStatus").hidden = false;
+  $("saveSummaryRetry").hidden = !retry;
+  $("saveSummarySlotLabel").hidden = true;
+  $("saveSummaryBody").replaceChildren();
+}
+
+function formatSummaryDelta(delta) {
+  return delta > 0 ? "+" + delta.toLocaleString() : delta.toLocaleString();
+}
+
+function renderSaveSlot(slot) {
+  const facts = [
+    ["游玩时长", slot.play_time],
+    ["地点", slot.location],
+    ["难度", slot.difficulty],
+    ["游戏保存时间", slot.saved_at],
+  ].filter(([, value]) => value);
+  if (Number.isFinite(slot.souls)) {
+    facts.push(["红魂", slot.souls.toLocaleString()]);
+  }
+  const carried = (slot.items || []).filter((item) => item.quantity > 0);
+  const changed = (slot.items || []).filter((item) => Number.isFinite(item.delta) && item.delta !== 0);
+  const changes = [];
+  if (slot.previous_goal && slot.previous_goal !== slot.goal) {
+    changes.push(`<li><span>上一版目标</span><span>${escapeHtml(slot.previous_goal)}</span></li>`);
+  }
+  if (Number.isFinite(slot.souls_delta) && slot.souls_delta !== 0) {
+    changes.push(`<li><span>红魂</span><span class="save-summary-number">${formatSummaryDelta(slot.souls_delta)}</span></li>`);
+  }
+  for (const item of changed) {
+    changes.push(`<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">${formatSummaryDelta(item.delta)}</span></li>`);
+  }
+  const changeContent = !slot.has_previous ? "<p>没有可对照的同一存档槽。</p>" :
+    changes.length ? `<ul>${changes.join("")}</ul>` : "<p>已显示的字段与上一版相同。</p>";
+  $("saveSummaryBody").innerHTML = `
+    <p class="save-summary-meta">当前目标</p>
+    <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>
+    <dl class="save-summary-facts">${facts.map(([label, value]) =>
+      `<dt>${label}</dt><dd>${escapeHtml(value)}</dd>`
+    ).join("")}</dl>
+    <details class="save-summary-section" open>
+      <summary>与上一备份的变化</summary>
+      <div class="save-summary-delta">${changeContent}</div>
+    </details>
+    <details class="save-summary-section">
+      <summary>背包（${carried.length} 种）</summary>
+      ${carried.length ? `<ul>${carried.map((item) =>
+        `<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">×${item.quantity.toLocaleString()}</span></li>`
+      ).join("")}</ul>` : "<p>这个存档槽没有携带物品。</p>"}
+    </details>`;
+}
+
+async function loadSaveSummary(g) {
+  const itemId = selectedId;
+  const node = selectedNode || (g.nodes || []).find((n) => n.id === g.current_id);
+  if (!g.summary_supported || !itemId || !node) {
+    hideSaveSummary();
+    return;
+  }
+  const key = itemId + ":" + node.id;
+  if (summaryKey === key) return;
+  summaryKey = key;
+  const request = ++summaryLoadId;
+  $("saveSummary").hidden = false;
+  const type = node.id === g.current_id ? "当前节点" : "历史节点";
+  $("saveSummaryNode").textContent = [type, formatTime(node.time)].filter(Boolean).join(" · ");
+  showSaveSummaryMessage("正在读取这版存档…");
+  let result;
+  try {
+    result = await api().node_summary(itemId, node.id);
+  } catch {
+    result = { ok: false, error: "暂时无法读取这版存档。" };
+  }
+  if (request !== summaryLoadId) return;
+  if (!result?.ok) {
+    showSaveSummaryMessage(result?.error || "暂时无法读取这版存档。", true);
+    return;
+  }
+  summarySlots = result.slots || [];
+  if (!summarySlots.length) {
+    showSaveSummaryMessage("这版备份没有可读取的存档槽。");
+    return;
+  }
+  $("saveSummaryStatus").hidden = true;
+  const select = $("saveSummarySlot");
+  select.replaceChildren(...summarySlots.map((slot) => new Option(slot.label, slot.index)));
+  $("saveSummarySlotLabel").hidden = summarySlots.length === 1;
+  const slot = summarySlots.find((entry) => entry.index === summarySlotIndex) || summarySlots[0];
+  select.value = slot.index;
+  summarySlotIndex = slot.index;
+  renderSaveSlot(slot);
 }
 
 function layout(g) {
@@ -390,7 +508,7 @@ function bindCanvas() {
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Space") return;
     const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary"))) return;
     e.preventDefault();
     spaceDown = true;
     pane.classList.add("pan");
@@ -477,6 +595,7 @@ function bindCanvas() {
 }
 
 function renderGraph(g) {
+  loadSaveSummary(g);
   const { nodes, colOf, rowOf, cols, colX } = getLayout(g);
   const current = onCurrentLine(g);
   const picked = selectedNode ? onNodeLine(nodes, selectedNode.id) : new Set();
@@ -658,6 +777,8 @@ async function removeItem(id, name) {
     selectedNode = null;
     graphData = null;
     lastFitItem = null;
+    hideSaveSummary();
+    summarySlotIndex = null;
   }
   await refreshItems();
   if (selectedId) await loadGraph();
@@ -770,6 +891,20 @@ document.addEventListener("click", () => {
 $("btnAdd").onclick = () => addFolder();
 $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
+$("saveSummary").addEventListener("toggle", () => {
+  if (graphData && !$("graphWrap").hidden) fitView();
+});
+$("saveSummaryRetry").onclick = () => {
+  if (!graphData) return;
+  summaryKey = "";
+  loadSaveSummary(graphData);
+};
+$("saveSummarySlot").onchange = (e) => {
+  const slot = summarySlots.find((entry) => String(entry.index) === e.target.value);
+  if (!slot) return;
+  summarySlotIndex = slot.index;
+  renderSaveSlot(slot);
+};
 $("btnSaveNow").onclick = async () => {
   if (Date.now() < swallowEnterUntil) return;
   if (!selectedId) return askOk("先选一个游戏");

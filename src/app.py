@@ -16,6 +16,7 @@ import pystray
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
+from save_summary import summarize_onimusha
 from scheduler import Scheduler
 from steam import scan_installed_games
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
@@ -26,6 +27,7 @@ ROOT = Path(os.environ["GAMEBACKUP_ROOT"]) if os.environ.get("GAMEBACKUP_ROOT") 
 )
 UI = ui_index()
 APP_TITLE = "存档助手 v1.1.0"
+ONIMUSHA_APP_ID = "2638890"
 
 
 def _icon_image() -> Image.Image:
@@ -139,7 +141,20 @@ class Api:
         g = graph(repo, hide_auto=bool(hide_auto), current_line=it.current_line)
         g["ok"] = True
         g["item_name"] = it.name
+        g["summary_supported"] = it.steam_app_id == ONIMUSHA_APP_ID
         return g
+
+    def node_summary(self, item_id: str, commit_id: str) -> dict:
+        it = find_item(load(ROOT), item_id)
+        if not it:
+            return {"ok": False, "error": "没有找到这份存档"}
+        if it.steam_app_id != ONIMUSHA_APP_ID:
+            return {"ok": False, "error": "这个游戏暂不支持存档摘要"}
+        try:
+            summary = summarize_onimusha(repo_dir(ROOT, it.id), commit_id, ROOT / "tools")
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, **summary}
 
     def restore(self, item_id: str, commit_id: str, fork: bool) -> dict:
         cfg = load(ROOT)

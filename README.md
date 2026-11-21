@@ -32,6 +32,18 @@
 
 备份数据默认在 `%LOCALAPPDATA%\gamebackup`，和游戏原目录分开存放。
 
+## 《鬼武者：剑之道》存档摘要
+
+Steam 版《鬼武者：剑之道》可以在存档树中查看当前目标、游玩时长、红魂和背包，以及相对上一份备份的变化。选择历史节点即可查看当时的状态。摘要从备份副本读取，任务完成清单需要另行确认任务标记含义。
+
+摘要需要单独安装 [Universal Save Editor](https://github.com/Lucasifium/universal-save-editor)。在项目源码目录运行：
+
+```powershell
+powershell -File scripts/install-summary-tools.ps1
+```
+
+脚本校验下载文件的 SHA-256 后，将解析器和物品名称表放到 `%LOCALAPPDATA%\gamebackup\tools`。如果使用 `GAMEBACKUP_ROOT`，则安装到该目录下的 `tools`。Windows 压缩包里的存档助手会使用同一目录。
+
 ## 运行（开发）
 
 需要 Windows 10/11，并已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)。

@@ -1,0 +1,181 @@
+"""Read-only summaries of Onimusha save snapshots."""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import tempfile
+from collections import Counter
+from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
+from threading import Lock
+
+from dulwich.errors import NotGitRepository
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
+
+_SAVE_NAME = "data001Slot.bin"
+_PLAY_TIME = re.compile(r"^(/[^/]+/[^/]+/([0-9]+))/_Data/_ResourceData/PlayTime$")
+_ITEM_ID = re.compile(r"^(/[^/]+/[^/]+/[0-9]+)/_Data/_Items/[0-9]+/ItemID$")
+# Avoid running multiple memory-intensive parsers when the user clicks through nodes quickly.
+_DECODE_LOCK = Lock()
+
+
+def _slots_from_values(values: dict) -> list[dict]:
+    slots = {}
+    last_index = -1
+    for pointer, time in values.items():
+        match = _PLAY_TIME.fullmatch(pointer)
+        if not match:
+            continue
+        slot_path, number = match.groups()
+        index = int(number)
+        last_index = max(last_index, index)
+        if type(time) not in (int, float) or time <= 0:
+            continue
+        detail = values.get(slot_path + "/Detail")
+        subtitle = values.get(slot_path + "/Subtitle")
+        detail = detail.split("\t", 3) if isinstance(detail, str) else []
+        subtitle = subtitle.split("\t", 1) if isinstance(subtitle, str) else []
+        saved_at, play_time, difficulty, goal = (detail + [""] * 4)[:4]
+        chapter, location = (subtitle + [""] * 2)[:2]
+        souls = values.get(slot_path + "/_Data/_ResourceData/SoulAmount")
+        slots[slot_path] = {
+            "index": index, "saved_at": saved_at, "chapter": chapter, "location": location,
+            "goal": goal, "play_time": play_time, "difficulty": difficulty,
+            "souls": souls if type(souls) is int else None, "inventory": Counter(),
+        }
+    if last_index < 0:
+        raise ValueError("未识别到《鬼武者》存档槽，请确认摘要工具和游戏版本。")
+
+    for pointer, item_id in values.items():
+        match = _ITEM_ID.fullmatch(pointer)
+        if not match or type(item_id) is not int or item_id == 0:
+            continue
+        slot = slots.get(match[1])
+        quantity = values.get(pointer.removesuffix("ItemID") + "EquipNum")
+        if slot is not None and type(quantity) is int and quantity > 0:
+            slot["inventory"][item_id] += quantity
+
+    def saved_order(slot: dict) -> tuple[datetime, int]:
+        try:
+            saved = datetime.strptime(slot["saved_at"], "%m/%d/%Y %H:%M:%S")
+        except ValueError:
+            saved = datetime.min
+        return saved, slot["index"]
+
+    for slot in slots.values():
+        index = slot["index"]
+        slot["label"] = "自动存档" if index == last_index else f"存档槽 {index + 1}"
+    return sorted(slots.values(), key=saved_order, reverse=True)
+
+
+def _blob_id(repo: Repo, commit: Commit) -> bytes:
+    tree = repo[commit.tree]
+    if not isinstance(tree, Tree):
+        raise ValueError("无法读取该节点的备份目录。")
+    return tree[_SAVE_NAME.encode("ascii")][1]
+
+
+@lru_cache(maxsize=32)
+def _decode_slots(repo_path: Path, blob_id: bytes, executable: Path, tool_version: int) -> list[dict]:
+    with Repo(str(repo_path)) as repo:
+        blob = repo[blob_id]
+    if not isinstance(blob, Blob):
+        raise ValueError("该节点的存档文件无法读取。")
+    try:
+        with tempfile.TemporaryDirectory(prefix="gamebackup-summary-") as temp:
+            copy = Path(temp) / _SAVE_NAME
+            copy.write_bytes(blob.data)
+            result = subprocess.run(
+                [str(executable), "list", str(copy), "--json"],
+                capture_output=True, encoding="utf-8-sig", check=True, timeout=20,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        values = json.loads(result.stdout)
+    except subprocess.TimeoutExpired as error:
+        raise ValueError("读取存档摘要超时，请重试。") from error
+    except (OSError, UnicodeError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
+        raise ValueError("摘要工具无法解析这版存档，请检查工具和存档版本。") from error
+    if not isinstance(values, dict):
+        raise ValueError("摘要工具返回的数据格式有误。")
+    return _slots_from_values(values)
+
+
+def _item_names(path: Path) -> dict[int, str]:
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        return {}
+    names = {}
+    for line in text.splitlines():
+        number, _, name = line.partition("\t")
+        if number.removeprefix("-").isdecimal() and name:
+            names[int(number)] = name
+    return names
+
+
+def summarize_onimusha(repo: Path, commit_id: str, tools_dir: Path) -> dict:
+    executable = (tools_dir / "UniversalSaveEditor.exe").resolve()
+    if not executable.is_file():
+        raise ValueError("请先运行 scripts/install-summary-tools.ps1 安装存档摘要工具。")
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", commit_id):
+        raise ValueError("找不到这个存档节点。")
+
+    repo = repo.resolve()
+    try:
+        with Repo(str(repo)) as history:
+            commit = history[commit_id.lower().encode("ascii")]
+            if not isinstance(commit, Commit):
+                raise ValueError("找不到这个存档节点。")
+            current_blob = _blob_id(history, commit)
+            previous_blob = None
+            if commit.parents:
+                try:
+                    parent = history[commit.parents[0]]
+                    if isinstance(parent, Commit):
+                        previous_blob = _blob_id(history, parent)
+                except (KeyError, OSError, ValueError):
+                    pass
+        with _DECODE_LOCK:
+            tool_version = executable.stat().st_mtime_ns
+            slots = _decode_slots(repo, current_blob, executable, tool_version)
+            previous_slots = {}
+            if previous_blob is not None:
+                try:
+                    previous_slots = {
+                        slot["index"]: slot
+                        for slot in _decode_slots(repo, previous_blob, executable, tool_version)
+                    }
+                except (KeyError, OSError, ValueError):
+                    pass
+    except (KeyError, OSError, NotGitRepository) as error:
+        raise ValueError("该节点没有可读取的《鬼武者》存档文件。") from error
+
+    names = _item_names(tools_dir / "onimusha_items.tsv")
+    summaries = []
+    for slot in slots:
+        previous = previous_slots.get(slot["index"])
+        inventory = slot["inventory"]
+        old_inventory = previous["inventory"] if previous is not None else Counter()
+        souls = slot["souls"]
+        old_souls = previous["souls"] if previous is not None else None
+        items = [
+            {
+                "id": item_id, "name": names.get(item_id, f"物品 #{item_id}"),
+                "quantity": inventory[item_id],
+                "delta": inventory[item_id] - old_inventory[item_id] if previous is not None else None,
+            }
+            for item_id in inventory.keys() | old_inventory.keys()
+        ]
+        items.sort(key=lambda item: (item["name"].casefold(), item["id"]))
+        summaries.append({
+            **{key: value for key, value in slot.items() if key != "inventory"},
+            "has_previous": previous is not None,
+            "previous_goal": previous["goal"] if previous is not None else None,
+            "souls_delta": souls - old_souls if souls is not None and old_souls is not None else None,
+            "items": items,
+        })
+    return {"slots": summaries}

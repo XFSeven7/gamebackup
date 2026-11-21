@@ -45,6 +45,19 @@
       </div>
       <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
     </section>
+    <details id="saveSummary" open hidden>
+      <summary>存档摘要</summary>
+      <div class="save-summary-content">
+        <p id="saveSummaryNode" class="save-summary-meta"></p>
+        <p id="saveSummaryStatus" class="save-summary-meta" role="status"></p>
+        <button type="button" id="saveSummaryRetry" hidden>重试</button>
+        <label id="saveSummarySlotLabel" hidden>
+          存档槽
+          <select id="saveSummarySlot"></select>
+        </label>
+        <div id="saveSummaryBody"></div>
+      </div>
+    </details>
   </main>
   <ul id="menu" hidden></ul>
   <div id="dlg" hidden>
