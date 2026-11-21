@@ -87,7 +87,57 @@ def _asset_id(path):
     return path.rsplit(".", 1)[-1].removeprefix("ID_").removesuffix("_C")
 
 
-ITEM_NAMES = {"Gold": "金币", "Gloom": "Gloom", "Glimpses": "Glimpses"}
+CURRENCY_NAMES = {"Gold": "钱币", "Gloom": "幽质", "Glimpses": "瞬悟"}
+
+# 简中名称参考 https://ms2db.com/zh-Hans/装备/物品。
+# 存档中的旧版物品和地图碎片用能从内部 ID 确认的描述。
+ITEM_NAMES = {
+    **CURRENCY_NAMES,
+    "Ancient_Artifact": "远古遗物",
+    "Artifact_MarshPearl": "沼泽珍珠",
+    "Artifact_TwinSesters": "双生姐妹遗物",
+    "Common_Old_Artifact": "普通旧遗物",
+    "Epic_Old_Artifact": "史诗旧遗物",
+    "FastTravel": "地母之息",
+    "IceCrown": "无玷之冠",
+    "MapPiece_City_1": "城市地图碎片 1",
+    "MapPiece_City_4": "城市地图碎片 4",
+    "MapPiece_City_5": "城市地图碎片 5",
+    "MapPiece_Forest_1": "森林地图碎片 1",
+    "MapPiece_Forest_2": "森林地图碎片 2",
+    "MapPiece_Forest_3": "森林地图碎片 3",
+    "MapPiece_Forest_4": "森林地图碎片 4",
+    "MapPiece_Forest_5": "森林地图碎片 5",
+    "MapUnlock": "鲁克的地图",
+    "Map_SideArm_Crossbow": "被遗忘的十字弩位置图",
+    "Map_Weapon_AxeDagger": "斧子与匕首位置图",
+    "Ovum": "圣卵",
+    "PP_Bloodseed": "血种",
+    "PP_Effigy_Burned": "烧焦的人偶",
+    "PP_Gear_Strange": "奇异齿轮",
+    "PP_Grisha": "格力煞残渣",
+    "PP_HealingAmount": "突触血管",
+    "PP_HealingCharge": "天尊腺体",
+    "PP_Mango": "芒果",
+    "PP_MartyrAsh": "殉教者的骨灰",
+    "PP_Moonshine_Inferior": "常见私酿酒",
+    "PP_Mushroom_Weltcap": "檐盖菇",
+    "PP_ParadoxicalScripture": "悖论经文",
+    "PP_Sheep": "羊头图腾",
+    "PP_Tarspore": "露孢菌",
+    "PP_Trollweed": "山怪草",
+    "Rare_Old_Artifact": "稀有旧遗物",
+    "SacredGland_Snow": "解冻腺体",
+    "Specimen": "提取的样本",
+    "TFM_01_Ventrium": "心石",
+    "TFM_02_Laterite": "红石",
+    "TFM_03_Dorsalite": "背甲石",
+    "Tarcore": "余露核心",
+    "Tarforge_ForgeMode_Sidearm": "黑曜石车床",
+    "Tarforge_ForgeMode_Weapon": "穆拉迪恩促动器",
+    "ThestusFlame": "泰斯特斯之焰",
+    "VratkoFeetPic_01": "维拉克托的自我习作",
+}
 
 
 def read_slot(data):
@@ -165,11 +215,9 @@ def read_slot(data):
         "已净化登陆点": number(player, "CleansedLandingAreas", default=0),
         "已获得成就": 0,
         "叙事标签": number(narrative, "NarrativeTags", default=0),
-        "金币": inventory["Gold"],
-        "Gloom": inventory["Gloom"],
-        "Glimpses": inventory["Glimpses"],
-        "待回收 Gloom": number(player, "LostGloomAmount", default=0),
-        "累计 Gloom": number(player, "CumulativeGloom", default=0),
+        **{name: inventory[key] for key, name in CURRENCY_NAMES.items()},
+        "待回收幽质": number(player, "LostGloomAmount", default=0),
+        "累计幽质": number(player, "CumulativeGloom", default=0),
         "生命": number(status, "Health", "d"),
         "躯壳生命": number(status, "ShellHealth", "d"),
         "Resolve": number(status, "Resolve", "d"),

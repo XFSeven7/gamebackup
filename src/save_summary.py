@@ -16,7 +16,7 @@ from dulwich.errors import NotGitRepository
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
-from mortal_shell_save import ITEM_NAMES as MORTAL_SHELL_ITEMS, read_slot as read_mortal_shell_slot
+from mortal_shell_save import CURRENCY_NAMES, ITEM_NAMES as MORTAL_SHELL_ITEMS, read_slot as read_mortal_shell_slot
 from onimusha_items_zh import ITEM_NAMES_ZH
 
 _SAVE_NAME = "data001Slot.bin"
@@ -259,7 +259,7 @@ def summarize_mortal_shell(repo: Path, commit_id: str) -> dict:
         changes = []
         if old is not None:
             for label, value in {**slot["facts"], "重生点": slot["location"]}.items():
-                if label in MORTAL_SHELL_ITEMS.values():
+                if label in CURRENCY_NAMES.values():
                     continue  # Currency is already compared with the inventory.
                 before = old["location"] if label == "重生点" else old["facts"].get(label)
                 if before is not None and value is not None and before != value:
