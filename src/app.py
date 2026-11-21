@@ -25,7 +25,7 @@ ROOT = Path(os.environ["GAMEBACKUP_ROOT"]) if os.environ.get("GAMEBACKUP_ROOT") 
     Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
 )
 UI = ui_index()
-APP_TITLE = "存档助手 v1.0.0"
+APP_TITLE = "存档助手 v1.1.0"
 
 
 def _icon_image() -> Image.Image:
