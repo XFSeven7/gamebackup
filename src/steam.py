@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import winreg
+from collections import Counter
 from pathlib import Path
 
 import vdf
@@ -131,4 +132,8 @@ def scan_installed_games() -> list[dict[str, str]]:
                     }
             except OSError:
                 continue
+    save_counts = Counter(Path(game["save_path"]) for game in games.values() if game["save_path"])
+    for game in games.values():
+        if game["save_path"] and save_counts[Path(game["save_path"])] > 1:
+            game["save_path"] = ""
     return sorted(games.values(), key=lambda game: (game["name"].casefold(), game["path"]))

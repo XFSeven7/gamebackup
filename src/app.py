@@ -79,11 +79,19 @@ class Api:
             return {"ok": False, "error": "找不到这个文件夹"}
         try:
             if steam_app_id:
-                game = next((game for game in scan_installed_games() if game["app_id"] == steam_app_id), None)
+                games = scan_installed_games()
+                game = next((game for game in games if game["app_id"] == steam_app_id), None)
                 if not game:
                     return {"ok": False, "error": "找不到这个 Steam 游戏，请刷新列表后重试"}
-                if Path(game["path"]).resolve().is_relative_to(p.resolve()):
+                selected = p.resolve()
+                if any(Path(entry["path"]).resolve().is_relative_to(selected) for entry in games):
                     return {"ok": False, "error": "选中的是游戏安装目录或其上级，请改选实际存档所在的文件夹"}
+                for other in games:
+                    if other["app_id"] == steam_app_id or not other.get("save_path"):
+                        continue
+                    other_save = Path(other["save_path"])
+                    if selected.is_relative_to(other_save) or other_save.is_relative_to(selected):
+                        return {"ok": False, "error": f"所选目录与「{other['name']}」的存档重叠，请重新选择。"}
             item = add_folder(ROOT, p, name.strip() or p.name, steam_app_id)
         except ValueError as e:
             return {"ok": False, "error": str(e)}

@@ -14,7 +14,7 @@ from scheduler import Scheduler
 
 
 class SteamScanTest(unittest.TestCase):
-    def test_tracking_rejects_game_installation_and_its_parent(self):
+    def test_tracking_rejects_installation_and_other_games_saves(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "backup"
             game_dir = Path(tmp) / "library" / "Game"
@@ -23,11 +23,22 @@ class SteamScanTest(unittest.TestCase):
             saves.mkdir()
             (saves / "game.sav").write_bytes(b"progress")
             game = {"app_id": "100", "name": "Game", "path": str(game_dir)}
+            other = Path(tmp) / "OtherGame" / "Saves"
+            other.mkdir(parents=True)
+            (other / "other.sav").write_bytes(b"other progress")
+            other_game = {
+                "app_id": "200", "name": "Other Game",
+                "path": str(game_dir.parent / "OtherGame"), "save_path": str(other),
+            }
             api = Api(Scheduler(root))
 
-            with patch("app.ROOT", root), patch("app.scan_installed_games", return_value=[game]):
+            with patch("app.ROOT", root), patch("app.scan_installed_games", return_value=[game, other_game]):
                 for folder in (game_dir, game_dir.parent):
                     self.assertFalse(api.add_folder(str(folder), "Game", "100")["ok"])
+                for folder in (other, other.parent):
+                    rejected = api.add_folder(str(folder), "Game", "100")
+                    self.assertFalse(rejected["ok"])
+                    self.assertIn("Other Game", rejected["error"])
                 self.assertEqual(load(root).items, [])
                 self.assertTrue(api.add_folder(str(saves), "Game", "100")["ok"])
 
@@ -64,6 +75,8 @@ class SteamScanTest(unittest.TestCase):
             first_path = make_manifest(root, "100", "Alpha")
             second_path = make_manifest(second, "200", '测试 "游戏"')
             legacy_path = make_manifest(legacy, "300", "Legacy")
+            shared_first = make_manifest(root, "600", "Shared A")
+            shared_second = make_manifest(root, "700", "Shared B")
             roaming = Path(tmp) / "Roaming"
             save_dirs = []
             for account, app_id, relative, location in (
@@ -79,6 +92,15 @@ class SteamScanTest(unittest.TestCase):
                 cache = root / "userdata" / account / app_id / "remotecache.vdf"
                 cache.parent.mkdir(parents=True, exist_ok=True)
                 cache.write_text(vdf.dumps({app_id: {relative: {"size": "8"}}}, pretty=True), encoding="utf-8")
+            shared_file = roaming / "Shared" / "slot.sav"
+            shared_file.parent.mkdir()
+            shared_file.write_bytes(b"progress")
+            for app_id in ("600", "700"):
+                cache = root / "userdata" / "42" / app_id / "remotecache.vdf"
+                cache.parent.mkdir()
+                cache.write_text(
+                    vdf.dumps({app_id: {"Shared/slot.sav": {"size": "8"}}}, pretty=True), encoding="utf-8",
+                )
             make_manifest(second, "100", "Duplicate")
             make_manifest(second, "400", "Uninstalled", installed=False)
             make_manifest(legacy, "228980", "Steamworks Common Redistributables")
@@ -89,6 +111,8 @@ class SteamScanTest(unittest.TestCase):
             self.assertEqual(games, [
                 {"app_id": "100", "name": "Alpha", "path": first_path, "save_path": save_dirs[0]},
                 {"app_id": "300", "name": "Legacy", "path": legacy_path, "save_path": ""},
+                {"app_id": "600", "name": "Shared A", "path": shared_first, "save_path": ""},
+                {"app_id": "700", "name": "Shared B", "path": shared_second, "save_path": ""},
                 {"app_id": "200", "name": '测试 "游戏"', "path": second_path, "save_path": save_dirs[1]},
             ])
 
