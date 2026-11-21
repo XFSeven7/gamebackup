@@ -75,9 +75,15 @@ class Api:
 
     def add_folder(self, path: str, name: str, steam_app_id: str = "") -> dict:
         p = Path(path)
-        if not p.is_dir():
+        if not path or not p.is_dir():
             return {"ok": False, "error": "找不到这个文件夹"}
         try:
+            if steam_app_id:
+                game = next((game for game in scan_installed_games() if game["app_id"] == steam_app_id), None)
+                if not game:
+                    return {"ok": False, "error": "找不到这个 Steam 游戏，请刷新列表后重试"}
+                if Path(game["path"]).resolve().is_relative_to(p.resolve()):
+                    return {"ok": False, "error": "选中的是游戏安装目录或其上级，请改选实际存档所在的文件夹"}
             item = add_folder(ROOT, p, name.strip() or p.name, steam_app_id)
         except ValueError as e:
             return {"ok": False, "error": str(e)}

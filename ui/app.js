@@ -579,7 +579,7 @@ function renderSteamGames() {
     const action = document.createElement("span");
     action.textContent = item ? "查看存档" : "跟踪存档";
     shortcut.appendChild(action);
-    shortcut.title = item ? "打开已有存档跟踪" : "选择存档文件夹 · " + game.path;
+    shortcut.title = item ? "打开已有存档跟踪" : "选择实际的存档文件夹";
     shortcut.onclick = () => item ? selectItem(item.id) : addFolder(game);
     row.appendChild(shortcut);
     list.appendChild(row);
@@ -608,12 +608,12 @@ async function addFolder(game) {
   if (addingFolder) return;
   addingFolder = true;
   try {
-    const path = await api().pick_folder(game?.path || "");
+    const path = await api().pick_folder();
     if (!path) return;
     const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
     const name = game?.name || await askText("给这个游戏起个名字，方便以后找", base);
     if (name === null) return;
-    setBusy(true, "正在打开存档跟踪…");
+    setBusy(true, "正在准备首次备份…");
     const r = await api().add_folder(path, name, game?.app_id || "");
     if (!r.ok) return askOk(r.error);
     await selectItem(r.item.id);

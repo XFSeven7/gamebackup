@@ -8,9 +8,29 @@ import vdf
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from steam import scan_installed_games
+from app import Api
+from config import load
+from scheduler import Scheduler
 
 
 class SteamScanTest(unittest.TestCase):
+    def test_tracking_rejects_game_installation_and_its_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "backup"
+            game_dir = Path(tmp) / "library" / "Game"
+            game_dir.mkdir(parents=True)
+            saves = game_dir / "SaveGames"
+            saves.mkdir()
+            (saves / "game.sav").write_bytes(b"progress")
+            game = {"app_id": "100", "name": "Game", "path": str(game_dir)}
+            api = Api(Scheduler(root))
+
+            with patch("app.ROOT", root), patch("app.scan_installed_games", return_value=[game]):
+                for folder in (game_dir, game_dir.parent):
+                    self.assertFalse(api.add_folder(str(folder), "Game", "100")["ok"])
+                self.assertEqual(load(root).items, [])
+                self.assertTrue(api.add_folder(str(saves), "Game", "100")["ok"])
+
     def test_scans_multiple_libraries_and_skips_stale_or_broken_manifests(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "Steam"
