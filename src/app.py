@@ -10,7 +10,7 @@ from dataclasses import asdict
 from functools import wraps
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 import webview
 import pystray
 
@@ -26,17 +26,14 @@ from store import add_tag, branch_exists, delete_line, delete_node as drop_node,
 DEFAULT_ROOT = default_backup_root()
 ROOT = backup_root(DEFAULT_ROOT)
 UI = ui_index()
+ICON_PATH = UI.with_name("gamebackup.ico")
 APP_TITLE = "存档助手 v1.1.0"
 ONIMUSHA_APP_ID = "2638890"
 
 
 def _icon_image() -> Image.Image:
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    d.ellipse((4, 4, 60, 60), fill=(61, 139, 253, 255))
-    d.rectangle((28, 16, 36, 48), fill=(255, 255, 255, 255))
-    d.polygon([(18, 34), (32, 50), (46, 34)], fill=(255, 255, 255, 255))
-    return img
+    with Image.open(ICON_PATH, formats=["ICO"]) as icon:
+        return icon.ico.getimage((64, 64)).convert("RGBA")
 
 
 def _short_path(path: str, keep: int = 42) -> str:
@@ -343,34 +340,45 @@ def _run_app() -> None:
     scheduler = Scheduler(ROOT)
     scheduler.start()
     api = Api(scheduler)
+    exiting = threading.Event()
+    window = webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
 
-    def show_window():
-        if webview.windows:
-            webview.windows[0].show()
-            webview.windows[0].restore()
-        else:
-            webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
+    def on_window_closing(sender, event):
+        if not exiting.is_set() and event.CloseReason.ToString() == "UserClosing":
+            event.Cancel = True
+            sender.Hide()
 
-    def quit_app(icon, _item):
-        scheduler.stop()
-        icon.stop()
-        for w in list(webview.windows):
-            w.destroy()
+    def bind_window_closing(window):
+        window.native.FormClosing += on_window_closing
+
+    window.events.before_show += bind_window_closing
+
+    def show_window(_icon, _item):
+        if not exiting.is_set():
+            window.show()
+            window.restore()
+
+    def quit_app(_icon, _item):
+        if not exiting.is_set():
+            exiting.set()
+            window.destroy()
 
     menu = pystray.Menu(
-        pystray.MenuItem("打开窗口", lambda _i, _j: show_window(), default=True),
+        pystray.MenuItem("打开窗口", show_window, default=True),
         pystray.MenuItem("暂停自动备份", lambda _i, _j: api.pause_all(True)),
         pystray.MenuItem("继续自动备份", lambda _i, _j: api.pause_all(False)),
         pystray.MenuItem("退出", quit_app),
     )
     icon = pystray.Icon("gamebackup", _icon_image(), APP_TITLE, menu)
-    threading.Thread(target=icon.run, daemon=True).start()
+    tray_thread = threading.Thread(target=icon.run, daemon=True)
+    tray_thread.start()
 
-    webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
     try:
-        webview.start()
+        webview.start(icon=str(ICON_PATH))
     finally:
         scheduler.stop()
+        icon.stop()
+        tray_thread.join(timeout=5)
 
 
 if __name__ == "__main__":
