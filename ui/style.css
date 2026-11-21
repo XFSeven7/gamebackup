@@ -51,6 +51,13 @@ li.item, li.line {
 }
 li.item:hover, li.line:hover { background: #333; }
 li.item.active, li.line.active { background: #2a3f5f; }
+.item-name { display: flex; align-items: baseline; gap: 6px; }
+.item-name > span { min-width: 0; overflow-wrap: anywhere; }
+.item-summary-icon {
+  flex: 0 0 16px; width: 16px; height: 16px;
+  color: var(--muted); fill: none; stroke: currentColor; stroke-width: 1.2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
 li.item .sub { color: var(--muted); font-size: 11px; word-break: break-all; }
 li.item .size { color: #d0d0d0; font-size: 12px; margin-top: 2px; }
 .side-total {

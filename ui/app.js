@@ -134,7 +134,13 @@ async function refreshItems() {
     li.className = "item" + (it.id === selectedId ? " active" : "") + (it.available ? "" : " missing");
     const size = it.size_text || formatBytes(it.size_bytes);
     const sub = it.available ? it.path_short : "找不到这个文件夹了";
-    li.innerHTML = `<div>${escapeHtml(it.name)}</div><div class="size">占用 ${escapeHtml(size)}</div><div class="sub">${escapeHtml(sub)}</div>`;
+    const summaryIcon = it.summary_supported ? `
+      <svg class="item-summary-icon" viewBox="0 0 16 16" role="img" aria-label="支持存档摘要">
+        <title>支持存档摘要</title>
+        <path d="M4 1.75h5l3 3v9.5H4z M9 1.75v3h3 M6 7h4 M6 9.5h4 M6 12h3" />
+      </svg>` : "";
+    li.innerHTML = `<div class="item-name"><span>${escapeHtml(it.name)}</span>${summaryIcon}</div>
+      <div class="size">占用 ${escapeHtml(size)}</div><div class="sub">${escapeHtml(sub)}</div>`;
     li.onclick = () => selectItem(it.id);
     li.oncontextmenu = (e) => {
       e.preventDefault();

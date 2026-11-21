@@ -84,6 +84,7 @@ class Api:
         for it in cfg.items:
             row = asdict(it)
             row["available"] = Path(it.path).is_dir()
+            row["summary_supported"] = it.steam_app_id == ONIMUSHA_APP_ID
             row["path_short"] = _short_path(it.path)
             nbytes = dir_nbytes(repo_dir(ROOT, it.id))
             row["size_bytes"] = nbytes
