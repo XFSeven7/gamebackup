@@ -132,6 +132,10 @@ async function refreshItems() {
     li.oncontextmenu = (e) => {
       e.preventDefault();
       showMenu(e.clientX, e.clientY, [
+        { label: "打开存档文件夹", run: async () => {
+          const r = await api().open_item_folder(it.id);
+          if (!r.ok) await askOk(r.error);
+        } },
         { label: "改名字", run: () => renameItem(it.id, it.name) },
         { label: it.paused ? "继续自动备份" : "暂停自动备份", run: () => api().pause_item(it.id, !it.paused).then(loadGraph) },
         { label: "删除", run: () => removeItem(it.id, it.name) },

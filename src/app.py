@@ -97,6 +97,19 @@ class Api:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "item": asdict(item)}
 
+    def open_item_folder(self, item_id: str) -> dict:
+        item = find_item(load(ROOT), item_id)
+        if not item:
+            return {"ok": False, "error": "没有找到这份存档"}
+        folder = Path(item.path)
+        if not folder.is_dir():
+            return {"ok": False, "error": "找不到这个存档文件夹"}
+        try:
+            os.startfile(folder)
+        except OSError as e:
+            return {"ok": False, "error": f"无法打开存档文件夹\n{e}"}
+        return {"ok": True}
+
     def rename_item(self, item_id: str, name: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)

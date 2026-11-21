@@ -17,6 +17,7 @@
     pause_item: async () => ({ ok: true }),
     pick_folder: async () => "",
     add_folder: async () => ({ ok: false, error: "演示模式" }),
+    open_item_folder: async () => ({ ok: false, error: "演示模式" }),
     rename_item: async () => ({ ok: true }),
     remove_item: async () => ({ ok: true }),
     restore: async () => ({ ok: true }),
