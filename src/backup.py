@@ -45,6 +45,7 @@ def _write_item(root: Path, item: ManagedFolder) -> None:
     cfg = load(root)
     for i, it in enumerate(cfg.items):
         if it.id == item.id:
+            item.steam_app_id = it.steam_app_id
             cfg.items[i] = item
             save(root, cfg)
             return
@@ -52,11 +53,24 @@ def _write_item(root: Path, item: ManagedFolder) -> None:
     save(root, cfg)
 
 
-def add_folder(root: Path, live_path: Path, name: str) -> ManagedFolder:
+def add_folder(root: Path, live_path: Path, name: str, steam_app_id: str = "") -> ManagedFolder:
     root = Path(root)
     live_path = Path(live_path).resolve()
     cfg = load(root)
-    item = ManagedFolder(id=new_id(), name=name or live_path.name, path=str(live_path))
+    if steam_app_id:
+        linked = next((it for it in cfg.items if it.steam_app_id == steam_app_id), None)
+        if linked:
+            return linked
+        for it in cfg.items:
+            if Path(it.path) == live_path:
+                if it.steam_app_id:
+                    raise ValueError("这个存档文件夹已关联到另一个 Steam 游戏")
+                it.steam_app_id = steam_app_id
+                save(root, cfg)
+                return it
+    item = ManagedFolder(
+        id=new_id(), name=name or live_path.name, path=str(live_path), steam_app_id=steam_app_id,
+    )
     init_repo(repo_dir(root, item.id))
     cfg.items.append(item)
     save(root, cfg)

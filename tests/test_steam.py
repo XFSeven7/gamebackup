@@ -52,9 +52,9 @@ class SteamScanTest(unittest.TestCase):
             with patch("steam._steam_root", return_value=root):
                 games = scan_installed_games()
             self.assertEqual(games, [
-                {"name": "Alpha", "path": first_path},
-                {"name": "Legacy", "path": legacy_path},
-                {"name": '测试 "游戏"', "path": second_path},
+                {"app_id": "100", "name": "Alpha", "path": first_path},
+                {"app_id": "300", "name": "Legacy", "path": legacy_path},
+                {"app_id": "200", "name": '测试 "游戏"', "path": second_path},
             ])
 
     def test_no_steam_installation_returns_empty_list(self):

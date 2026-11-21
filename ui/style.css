@@ -45,6 +45,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   background: transparent; border: 0; text-align: left; overflow-wrap: anywhere;
 }
 #steamGameList button:hover { background: #333; }
+#steamGameList button span { display: block; color: var(--muted); font-size: 11px; }
 li.item, li.line {
   padding: 8px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 4px;
 }

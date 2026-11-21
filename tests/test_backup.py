@@ -11,6 +11,26 @@ from store import graph
 
 
 class BackupTest(unittest.TestCase):
+    def test_steam_shortcut_links_existing_backup_and_reuses_it_by_app_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "data"
+            live = Path(d) / "save"
+            another = Path(d) / "another"
+            live.mkdir()
+            another.mkdir()
+            (live / "game.sav").write_bytes(b"progress")
+            existing = add_folder(root, live, "自定义名称")
+
+            linked = add_folder(root, live, "Steam 游戏", steam_app_id="100")
+            reopened = add_folder(root, another, "改名后的 Steam 游戏", steam_app_id="100")
+
+            self.assertEqual(linked.id, existing.id)
+            self.assertEqual(reopened.id, existing.id)
+            self.assertEqual(reopened.name, "自定义名称")
+            self.assertEqual(load(root).items, [reopened])
+            self.assertEqual(reopened.steam_app_id, "100")
+            self.assertEqual((root / "repos" / existing.id / "game.sav").read_bytes(), b"progress")
+
     def test_two_folders_independent(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "data"

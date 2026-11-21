@@ -73,11 +73,14 @@ class Api:
             return ""
         return str(result[0])
 
-    def add_folder(self, path: str, name: str) -> dict:
+    def add_folder(self, path: str, name: str, steam_app_id: str = "") -> dict:
         p = Path(path)
         if not p.is_dir():
             return {"ok": False, "error": "找不到这个文件夹"}
-        item = add_folder(ROOT, p, name.strip() or p.name)
+        try:
+            item = add_folder(ROOT, p, name.strip() or p.name, steam_app_id)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
         return {"ok": True, "item": asdict(item)}
 
     def rename_item(self, item_id: str, name: str) -> dict:

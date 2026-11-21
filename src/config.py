@@ -16,6 +16,7 @@ class ManagedFolder:
     current_line: str = "main"
     paused: bool = False
     last_fingerprint: str = ""
+    steam_app_id: str = ""
 
 
 @dataclass

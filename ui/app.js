@@ -1,6 +1,8 @@
 const api = () => window.pywebview.api;
 
 let items = [];
+let steamGames = [];
+let addingFolder = false;
 let selectedId = null;
 let graphData = null;
 let selectedNode = null;
@@ -117,6 +119,7 @@ function formatBytes(n) {
 
 async function refreshItems() {
   items = await api().list_items();
+  renderSteamGames();
   const ul = $("itemList");
   ul.innerHTML = "";
   items.forEach((it) => {
@@ -564,28 +567,36 @@ function renderGraph(g) {
   });
 }
 
+function renderSteamGames() {
+  const list = $("steamGameList");
+  list.replaceChildren();
+  for (const game of steamGames) {
+    const item = items.find((it) => it.steam_app_id === game.app_id);
+    const row = document.createElement("li");
+    const shortcut = document.createElement("button");
+    shortcut.type = "button";
+    shortcut.textContent = game.name;
+    const action = document.createElement("span");
+    action.textContent = item ? "查看存档" : "跟踪存档";
+    shortcut.appendChild(action);
+    shortcut.title = item ? "打开已有存档跟踪" : "选择存档文件夹 · " + game.path;
+    shortcut.onclick = () => item ? selectItem(item.id) : addFolder(game);
+    row.appendChild(shortcut);
+    list.appendChild(row);
+  }
+}
+
 async function scanSteamGames() {
   const button = $("btnScanSteam");
   const status = $("steamScanStatus");
-  const list = $("steamGameList");
   button.disabled = true;
   status.hidden = false;
   status.textContent = "正在扫描…";
   try {
-    const games = await api().scan_steam_games();
-    list.replaceChildren();
-    for (const game of games) {
-      const row = document.createElement("li");
-      const pick = document.createElement("button");
-      pick.type = "button";
-      pick.textContent = game.name;
-      pick.title = "选择存档文件夹 · " + game.path;
-      pick.onclick = () => addFolder(game);
-      row.appendChild(pick);
-      list.appendChild(row);
-    }
-    status.hidden = games.length > 0;
-    status.textContent = games.length ? "" : "没找到已安装的 Steam 游戏";
+    steamGames = await api().scan_steam_games();
+    renderSteamGames();
+    status.hidden = steamGames.length > 0;
+    status.textContent = steamGames.length ? "" : "没找到已安装的 Steam 游戏";
   } catch (e) {
     status.textContent = "Steam 扫描失败，可点刷新重试";
   } finally {
@@ -594,16 +605,24 @@ async function scanSteamGames() {
 }
 
 async function addFolder(game) {
-  const path = await api().pick_folder(game?.path || "");
-  if (!path) return;
-  const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
-  const name = await askText("给这个游戏起个名字，方便以后找", game?.name || base);
-  if (name === null) return;
-  const r = await api().add_folder(path, name);
-  if (!r.ok) return askOk(r.error);
-  selectedId = r.item.id;
-  await refreshItems();
-  await loadGraph();
+  if (addingFolder) return;
+  addingFolder = true;
+  try {
+    const path = await api().pick_folder(game?.path || "");
+    if (!path) return;
+    const base = path.split(/[/\\]/).filter(Boolean).pop() || "存档";
+    const name = game?.name || await askText("给这个游戏起个名字，方便以后找", base);
+    if (name === null) return;
+    setBusy(true, "正在打开存档跟踪…");
+    const r = await api().add_folder(path, name, game?.app_id || "");
+    if (!r.ok) return askOk(r.error);
+    await selectItem(r.item.id);
+  } catch (e) {
+    return askOk("无法打开存档跟踪，请重试。");
+  } finally {
+    setBusy(false);
+    addingFolder = false;
+  }
 }
 
 async function renameItem(id, old) {

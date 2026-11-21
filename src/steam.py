@@ -86,7 +86,7 @@ def scan_installed_games() -> list[dict[str, str]]:
             install_path = steamapps / "common" / folder
             try:
                 if install_path.is_dir():
-                    games[app_id] = {"name": name, "path": str(install_path)}
+                    games[app_id] = {"app_id": app_id, "name": name, "path": str(install_path)}
             except OSError:
                 continue
     return sorted(games.values(), key=lambda game: (game["name"].casefold(), game["path"]))
