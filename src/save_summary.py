@@ -16,6 +16,8 @@ from dulwich.errors import NotGitRepository
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
+from onimusha_items_zh import ITEM_NAMES_ZH
+
 _SAVE_NAME = "data001Slot.bin"
 _PLAY_TIME = re.compile(r"^(/[^/]+/[^/]+/([0-9]+))/_Data/_ResourceData/PlayTime$")
 _ITEM_ID = re.compile(r"^(/[^/]+/[^/]+/[0-9]+)/_Data/_Items/[0-9]+/ItemID$")
@@ -155,6 +157,7 @@ def summarize_onimusha(repo: Path, commit_id: str, tools_dir: Path) -> dict:
         raise ValueError("该节点没有可读取的《鬼武者》存档文件。") from error
 
     names = _item_names(tools_dir / "onimusha_items.tsv")
+    names.update(ITEM_NAMES_ZH)
     summaries = []
     for slot in slots:
         previous = previous_slots.get(slot["index"])

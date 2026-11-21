@@ -19,7 +19,7 @@ class SaveSummaryTest(unittest.TestCase):
             tools = root / "tools"
             tools.mkdir()
             (tools / "UniversalSaveEditor.exe").touch()
-            (tools / "onimusha_items.tsv").write_text("1\tStone\n2\tIron\n", encoding="utf-8")
+            (tools / "onimusha_items.tsv").write_text("15508\tWhetstone\n2\tUnknown tool\n", encoding="utf-8")
             init_repo(repo)
             save = repo / "data001Slot.bin"
             save.write_bytes(b"previous")
@@ -42,7 +42,7 @@ class SaveSummaryTest(unittest.TestCase):
                     f"{slot}/_Data/_ResourceData/SoulAmount": 100 if earlier else 115,
                     f"{slot}/Detail": f"11/21/2026 22:00:00\t009:35:23\t剑戟\t{'寺庙' if earlier else '寻找父亲'}",
                     f"{slot}/Subtitle": "101\t清水寺",
-                    f"{slot}/_Data/_Items/0/ItemID": 1,
+                    f"{slot}/_Data/_Items/0/ItemID": 15508,
                     f"{slot}/_Data/_Items/0/EquipNum": 2 if earlier else 5,
                     f"{slot}/_Data/_Items/1/ItemID": 2,
                     f"{slot}/_Data/_Items/1/EquipNum": 1 if earlier else 0,
@@ -59,8 +59,8 @@ class SaveSummaryTest(unittest.TestCase):
             self.assertEqual(result["souls_delta"], 15)
             self.assertTrue(result["has_previous"])
             self.assertCountEqual(result["items"], [
-                {"id": 1, "name": "Stone", "quantity": 5, "delta": 3},
-                {"id": 2, "name": "Iron", "quantity": 0, "delta": -1},
+                {"id": 15508, "name": "砥石", "quantity": 5, "delta": 3},
+                {"id": 2, "name": "Unknown tool", "quantity": 0, "delta": -1},
             ])
             self.assertFalse(baseline["has_previous"])
             self.assertIsNone(baseline["items"][0]["delta"])
