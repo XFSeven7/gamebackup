@@ -19,7 +19,7 @@ import pystray
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
-from save_summary import summarize_onimusha
+from save_summary import summarize_mortal_shell, summarize_onimusha
 from scheduler import Scheduler
 from steam import scan_installed_games
 from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
@@ -33,6 +33,16 @@ ICON_PATH = UI.with_name("gamebackup.ico")
 APP_VERSION = "v1.1.2"
 APP_TITLE = f"存档助手 {APP_VERSION}"
 ONIMUSHA_APP_ID = "2638890"
+
+
+def _summary_kind(item):
+    if item.steam_app_id == ONIMUSHA_APP_ID:
+        return "onimusha"
+    if tuple(part.casefold() for part in Path(item.path).parts[-3:]) == (
+        "mortalshell2", "saved", "savegames",
+    ):
+        return "mortal_shell"
+    return None
 
 
 def _icon_image() -> Image.Image:
@@ -173,7 +183,7 @@ class Api:
         for it in cfg.items:
             row = asdict(it)
             row["available"] = Path(it.path).is_dir()
-            row["summary_supported"] = it.steam_app_id == ONIMUSHA_APP_ID
+            row["summary_supported"] = _summary_kind(it) is not None
             row["path_short"] = _short_path(it.path)
             nbytes = dir_nbytes(repo_dir(ROOT, it.id))
             row["size_bytes"] = nbytes
@@ -267,7 +277,7 @@ class Api:
         g = graph(repo, hide_auto=bool(hide_auto), current_line=it.current_line)
         g["ok"] = True
         g["item_name"] = it.name
-        g["summary_supported"] = it.steam_app_id == ONIMUSHA_APP_ID
+        g["summary_supported"] = _summary_kind(it) is not None
         return g
 
     @_data_operation
@@ -275,10 +285,15 @@ class Api:
         it = find_item(load(ROOT), item_id)
         if not it:
             return {"ok": False, "error": "没有找到这份存档"}
-        if it.steam_app_id != ONIMUSHA_APP_ID:
+        kind = _summary_kind(it)
+        if kind is None:
             return {"ok": False, "error": "这个游戏暂不支持存档摘要"}
+        repo = repo_dir(ROOT, it.id)
         try:
-            summary = summarize_onimusha(repo_dir(ROOT, it.id), commit_id, ROOT / "tools")
+            if kind == "mortal_shell":
+                summary = summarize_mortal_shell(repo, commit_id)
+            else:
+                summary = summarize_onimusha(repo, commit_id, ROOT / "tools")
         except ValueError as e:
             return {"ok": False, "error": str(e)}
         return {"ok": True, **summary}

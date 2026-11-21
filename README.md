@@ -48,6 +48,10 @@ powershell -File scripts/install-summary-tools.ps1
 
 脚本校验下载文件的 SHA-256 后，将解析器和物品名称表放到当前备份目录下的 `tools`。Windows 压缩包里的存档助手会使用同一目录。
 
+## 《致命躯壳 2》存档摘要
+
+添加 `%LOCALAPPDATA%\MortalShell2\Saved\SaveGames` 后，选择存档树中的节点可查看正式版槽位和试玩档的游玩时长、战斗进度、装备、货币和背包，以及与上一备份同一槽位的变化。摘要直接读取备份，无需安装工具。未对照游戏内名称的物品和重生点显示内部 ID。
+
 ## 运行（开发）
 
 需要 Windows 10/11，并已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)。

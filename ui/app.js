@@ -294,16 +294,21 @@ function formatSummaryDelta(delta) {
   return delta > 0 ? "+" + delta.toLocaleString() : delta.toLocaleString();
 }
 
+function formatSummaryValue(value) {
+  return typeof value === "number" ? value.toLocaleString() : value;
+}
+
 function renderSaveSlot(slot) {
   const facts = [
     ["游玩时长", slot.play_time],
-    ["地点", slot.location],
+    [slot.facts ? "重生点" : "地点", slot.location],
     ["难度", slot.difficulty],
     ["游戏保存时间", slot.saved_at],
   ].filter(([, value]) => value);
   if (Number.isFinite(slot.souls)) {
     facts.push(["红魂", slot.souls.toLocaleString()]);
   }
+  facts.push(...Object.entries(slot.facts || {}));
   const carried = (slot.items || []).filter((item) => item.quantity > 0);
   const changed = (slot.items || []).filter((item) => Number.isFinite(item.delta) && item.delta !== 0);
   const changes = [];
@@ -313,16 +318,20 @@ function renderSaveSlot(slot) {
   if (Number.isFinite(slot.souls_delta) && slot.souls_delta !== 0) {
     changes.push(`<li><span>红魂</span><span class="save-summary-number">${formatSummaryDelta(slot.souls_delta)}</span></li>`);
   }
+  for (const {label, before, after} of slot.changes || []) {
+    const change = `${formatSummaryValue(before)} → ${formatSummaryValue(after)}`;
+    changes.push(`<li><span>${escapeHtml(label)}</span><span>${escapeHtml(change)}</span></li>`);
+  }
   for (const item of changed) {
     changes.push(`<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">${formatSummaryDelta(item.delta)}</span></li>`);
   }
   const changeContent = !slot.has_previous ? "<p>没有可对照的同一存档槽。</p>" :
     changes.length ? `<ul>${changes.join("")}</ul>` : "<p>已显示的字段与上一版相同。</p>";
   $("saveSummaryBody").innerHTML = `
-    <p class="save-summary-meta">当前目标</p>
-    <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>
+    ${slot.facts ? "" : `<p class="save-summary-meta">当前目标</p>
+    <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`}
     <dl class="save-summary-facts">${facts.map(([label, value]) =>
-      `<dt>${label}</dt><dd>${escapeHtml(value)}</dd>`
+      `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatSummaryValue(value))}</dd>`
     ).join("")}</dl>
     <details class="save-summary-section" open>
       <summary>与上一备份的变化</summary>
