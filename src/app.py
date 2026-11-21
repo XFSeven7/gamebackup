@@ -30,7 +30,7 @@ DEFAULT_ROOT = default_backup_root()
 ROOT = backup_root(DEFAULT_ROOT)
 UI = ui_index()
 ICON_PATH = UI.with_name("gamebackup.ico")
-APP_VERSION = "v1.1.2"
+APP_VERSION = "v1.1.3"
 APP_TITLE = f"存档助手 {APP_VERSION}"
 ONIMUSHA_APP_ID = "2638890"
 
