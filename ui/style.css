@@ -25,7 +25,20 @@ button {
 }
 button:hover { background: #3d3d3d; }
 #btnAdd, #btnAddBig, #btnSaveNow { background: var(--accent); border-color: #2d6fd0; color: #fff; }
-main { position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr); height: calc(100% - 48px); }
+body { display: flex; flex-direction: column; }
+header { flex: none; }
+main { position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr); flex: 1; min-height: 0; }
+#updatePanel { flex: none; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.update-row { display: flex; flex-wrap: wrap; align-items: start; gap: 8px; }
+.update-content { flex: 1 1 240px; }
+#updateStatus { color: var(--muted); margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#updateDownload:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 4px; }
+#updateProgress { width: min(100%, 240px); accent-color: var(--accent); }
+#updateBytes { font-variant-numeric: tabular-nums; }
+#updateNow { background: var(--accent); color: #fff; }
+#updateNotes { margin-top: 6px; }
+#updateNotes summary { cursor: pointer; }
+#updateNotesBody { max-height: 8em; margin: 4px 0 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 main.side-off { grid-template-columns: 1fr; }
 aside {
   display: flex; flex-direction: column;

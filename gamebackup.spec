@@ -14,6 +14,7 @@ for pkg in ("webview", "pythonnet", "clr_loader"):
 hidden += collect_submodules("dulwich")
 hidden += ["pystray._win32", "pystray._util.win32"]
 datas += [(str(root / "ui"), "ui")]
+datas += [(str(root / "scripts" / "install-update.ps1"), "scripts")]
 
 a = Analysis(
     [str(root / "run.py")],

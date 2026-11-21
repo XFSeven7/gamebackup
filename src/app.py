@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import ctypes
 import os
+import shutil
 import sys
+import tempfile
 import threading
 from dataclasses import asdict
 from functools import wraps
@@ -22,12 +24,14 @@ from scheduler import Scheduler
 from steam import scan_installed_games
 from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
+from updater import check_release, stage_release, start_installer
 
 DEFAULT_ROOT = default_backup_root()
 ROOT = backup_root(DEFAULT_ROOT)
 UI = ui_index()
 ICON_PATH = UI.with_name("gamebackup.ico")
-APP_TITLE = "存档助手 v1.1.1"
+APP_VERSION = "v1.1.2"
+APP_TITLE = f"存档助手 {APP_VERSION}"
 ONIMUSHA_APP_ID = "2638890"
 
 
@@ -51,9 +55,97 @@ def _data_operation(method):
 
 
 class Api:
-    def __init__(self, scheduler: Scheduler):
+    def __init__(self, scheduler: Scheduler, quit_app=None, exiting: threading.Event | None = None):
         self._scheduler = scheduler
         self._pause_all = False
+        self._quit_app = quit_app
+        self._exiting = exiting if exiting is not None else threading.Event()
+        self._update_lock = threading.Lock()
+        self._release = None
+        self._update_work = None
+        self._update_status = {"phase": "idle", "received": 0}
+
+    def check_update(self) -> dict | None:
+        if (self._quit_app is None or not getattr(sys, "frozen", False)
+                or Path(sys.executable).name.lower() != "gamebackup.exe"):
+            return None
+        try:
+            self._release = check_release(APP_VERSION)
+        except (OSError, ValueError):
+            return None
+        if self._release:
+            return {"version": self._release.version, "notes": self._release.notes, "size": self._release.size}
+        return None
+
+    def update_progress(self) -> dict:
+        return self._update_status
+
+    def update_ready(self) -> None:
+        signal = os.environ.pop("GAMEBACKUP_UPDATE_READY", None)
+        if signal and getattr(sys, "frozen", False):
+            ready = Path(signal)
+            if (ready.name == "ready" and ready.parent.name.startswith(".gamebackup-update-")
+                    and ready.parent.parent == Path(sys.executable).resolve().parent):
+                ready.touch(exist_ok=False)
+
+    def download_update(self) -> dict:
+        if not self._update_lock.acquire(blocking=False):
+            return {"ok": False, "error": "正在处理更新。"}
+        work = None
+        try:
+            if not self._release or self._update_work:
+                return {"ok": False, "error": "没有待下载的更新。"}
+            install = Path(sys.executable).resolve().parent
+            work = Path(tempfile.mkdtemp(prefix=".gamebackup-update-", dir=install))
+
+            def report(phase, received):
+                if self._exiting.is_set():
+                    raise InterruptedError("应用已退出。")
+                self._update_status = {"phase": phase, "received": received}
+
+            report("downloading", 0)
+            stage_release(self._release, work, report)
+            self._update_work = work
+            return {"ok": True}
+        except Exception as error:
+            if work:
+                shutil.rmtree(work, ignore_errors=True)
+            return {"ok": False, "error": f"无法准备更新。\n{error}"}
+        finally:
+            self._update_lock.release()
+
+    def install_update(self) -> dict:
+        with self._scheduler.data_lock, self._update_lock:
+            work = self._update_work
+            if work is None or self._exiting.is_set():
+                return {"ok": False, "error": "没有可安装的更新。"}
+            try:
+                install = work.parent
+                internal = install / "_internal"
+                if internal.resolve() != internal or Path(sys._MEIPASS).resolve() != internal:
+                    raise ValueError("当前应用目录不支持自动替换，请手动更新。")
+                if any(path.resolve().is_relative_to(work) for path in (ROOT, DEFAULT_ROOT)):
+                    return {"ok": False, "retry_install": True,
+                            "error": "备份位置位于更新目录内，请先将备份迁移到其他目录。"}
+                data_paths = (ROOT, DEFAULT_ROOT, *(Path(item.path) for item in load(ROOT).items))
+                if any(path.resolve().is_relative_to(internal) for path in data_paths):
+                    raise ValueError("程序组件目录内有备份或正在跟踪的存档，请将数据移出 _internal 后重试。")
+                start_installer(install, work)
+            except (OSError, ValueError) as error:
+                self._update_work = None
+                shutil.rmtree(work, ignore_errors=True)
+                return {"ok": False, "error": f"无法启动安装。\n{error}"}
+            self._update_work = None
+        self._quit_app()
+        return {"ok": True}
+
+    def _discard_update(self):
+        with self._update_lock:
+            if self._update_work and not any(
+                path.resolve().is_relative_to(self._update_work) for path in (ROOT, DEFAULT_ROOT)
+            ):
+                shutil.rmtree(self._update_work, ignore_errors=True)
+                self._update_work = None
 
     @_data_operation
     def backup_location(self) -> dict:
@@ -339,8 +431,14 @@ def _run_app() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     scheduler = Scheduler(ROOT)
     scheduler.start()
-    api = Api(scheduler)
     exiting = threading.Event()
+
+    def quit_app(_icon=None, _item=None):
+        if not exiting.is_set():
+            exiting.set()
+            window.destroy()
+
+    api = Api(scheduler, quit_app, exiting)
     window = webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
 
     def on_window_closing(sender, event):
@@ -358,11 +456,6 @@ def _run_app() -> None:
             window.show()
             window.restore()
 
-    def quit_app(_icon, _item):
-        if not exiting.is_set():
-            exiting.set()
-            window.destroy()
-
     menu = pystray.Menu(
         pystray.MenuItem("打开窗口", show_window, default=True),
         pystray.MenuItem("暂停自动备份", lambda _i, _j: api.pause_all(True)),
@@ -376,9 +469,11 @@ def _run_app() -> None:
     try:
         webview.start(icon=str(ICON_PATH))
     finally:
+        exiting.set()
         scheduler.stop()
         icon.stop()
         tray_thread.join(timeout=5)
+        api._discard_update()
 
 
 if __name__ == "__main__":

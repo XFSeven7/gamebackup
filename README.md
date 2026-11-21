@@ -13,6 +13,8 @@
 
 历史版本见 [Releases](https://github.com/XFSeven7/gamebackup/releases)。
 
+从 v1.1.2 起，Windows 版启动后会在后台检查最新正式版本。发现更新时，可查看「本次更新」，点击「立即更新」后会显示下载进度。下载校验完成后，应用会自动安装并重启，存档和设置保留。
+
 ![主界面：多游戏 + 存档树](docs/images/main.png)
 
 ## 能做什么

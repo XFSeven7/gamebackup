@@ -109,6 +109,75 @@ function onReady(fn) {
   else window.addEventListener("pywebviewready", fn);
 }
 
+async function showAvailableUpdate() {
+  let release;
+  try {
+    release = await api().check_update?.();
+  } catch {
+    return;
+  }
+  if (!release) return;
+
+  const panel = $("updatePanel");
+  const update = $("updateNow");
+  const later = $("updateLater");
+  const status = $("updateStatus");
+  const download = $("updateDownload");
+  const progress = $("updateProgress");
+  const bytes = $("updateBytes");
+  $("updateVersion").textContent = `发现新版本 ${release.version}`;
+  $("updateNotesBody").textContent = release.notes.trim() || "此版本没有填写更新说明。";
+  progress.max = release.size;
+  panel.hidden = false;
+  later.onclick = () => { panel.hidden = true; };
+
+  let ready = false;
+  update.onclick = async () => {
+    update.hidden = later.hidden = true;
+    try {
+      if (!ready) {
+        download.hidden = false;
+        progress.value = 0;
+        bytes.textContent = `0% · 0 B / ${formatBytes(release.size)}`;
+        status.textContent = "正在下载更新…";
+        let downloading = true;
+        const timer = setInterval(async () => {
+          try {
+            const state = await api().update_progress();
+            if (!downloading) return;
+            progress.value = state.received;
+            const percent = Math.floor(state.received * 100 / release.size);
+            bytes.textContent = `${percent}% · ${formatBytes(state.received)} / ${formatBytes(release.size)}`;
+            if (state.phase === "verifying") status.textContent = "正在校验并解包…";
+          } catch {}
+        }, 250);
+        try {
+          const result = await api().download_update();
+          if (!result.ok) throw new Error(result.error);
+          ready = true;
+        } finally {
+          downloading = false;
+          clearInterval(timer);
+        }
+      }
+      progress.value = release.size;
+      bytes.textContent = `100% · ${formatBytes(release.size)} / ${formatBytes(release.size)}`;
+      status.textContent = "正在安装，完成后将自动重启…";
+      // Yield a frame so the installation status is visible before the native window closes.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const result = await api().install_update();
+      if (!result.ok) {
+        ready = Boolean(result.retry_install);
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      status.textContent = error.message || "更新失败，请重试。";
+      update.textContent = "重试";
+      update.hidden = later.hidden = false;
+    }
+  };
+}
+
 function formatBytes(n) {
   n = Math.max(0, Number(n) || 0);
   if (n < 1024) return n + " B";
@@ -1018,8 +1087,10 @@ async function pullGraphIfChanged() {
 
 onReady(async () => {
   bindCanvas();
+  showAvailableUpdate();
   scanSteamGames();
   await refreshItems();
+  if (api().update_ready) await api().update_ready();
   if (selectedId) await loadGraph();
   try {
     graphRev = (await api().graph_rev()).rev;
