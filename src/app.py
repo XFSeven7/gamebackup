@@ -7,6 +7,7 @@ import os
 import sys
 import threading
 from dataclasses import asdict
+from functools import wraps
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -19,12 +20,11 @@ from paths import WEBVIEW2_HELP, ui_index, webview2_installed
 from save_summary import summarize_onimusha
 from scheduler import Scheduler
 from steam import scan_installed_games
+from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
 from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
 
-# ponytail: GAMEBACKUP_ROOT 方便演示/截图，不碰用户真实数据。
-ROOT = Path(os.environ["GAMEBACKUP_ROOT"]) if os.environ.get("GAMEBACKUP_ROOT") else (
-    Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "gamebackup"
-)
+DEFAULT_ROOT = default_backup_root()
+ROOT = backup_root(DEFAULT_ROOT)
 UI = ui_index()
 APP_TITLE = "存档助手 v1.1.0"
 ONIMUSHA_APP_ID = "2638890"
@@ -45,11 +45,39 @@ def _short_path(path: str, keep: int = 42) -> str:
     return path[:12] + "..." + path[-(keep - 15) :]
 
 
+def _data_operation(method):
+    @wraps(method)
+    def run(self, *args, **kwargs):
+        with self._scheduler.data_lock:
+            return method(self, *args, **kwargs)
+    return run
+
+
 class Api:
     def __init__(self, scheduler: Scheduler):
-        self.scheduler = scheduler
+        self._scheduler = scheduler
         self._pause_all = False
 
+    @_data_operation
+    def backup_location(self) -> dict:
+        return {"path": str(ROOT)}
+
+    @_data_operation
+    def move_backup_location(self, path: str) -> dict:
+        global ROOT
+        try:
+            destination = Path(path)
+            if not destination.is_absolute():
+                raise ValueError("请选择备份文件夹。")
+            destination = destination.resolve()
+            warning = migrate_backup(ROOT, destination, default_root=DEFAULT_ROOT)
+        except (OSError, ValueError) as error:
+            return {"ok": False, "error": f"迁移未完成，仍在使用原目录。\n{error}"}
+        ROOT = destination
+        self._scheduler.root = destination
+        return {"ok": True, "path": str(destination), "warning": warning}
+
+    @_data_operation
     def list_items(self) -> list[dict]:
         cfg = load(ROOT)
         out = []
@@ -75,17 +103,21 @@ class Api:
             return ""
         return str(result[0])
 
+    @_data_operation
     def add_folder(self, path: str, name: str, steam_app_id: str = "") -> dict:
         p = Path(path)
         if not path or not p.is_dir():
             return {"ok": False, "error": "找不到这个文件夹"}
         try:
+            selected = p.resolve()
+            backup_dir = ROOT.resolve()
+            if selected.is_relative_to(backup_dir) or backup_dir.is_relative_to(selected):
+                return {"ok": False, "error": "存档文件夹不能与备份目录重叠"}
             if steam_app_id:
                 games = scan_installed_games()
                 game = next((game for game in games if game["app_id"] == steam_app_id), None)
                 if not game:
                     return {"ok": False, "error": "找不到这个 Steam 游戏，请刷新列表后重试"}
-                selected = p.resolve()
                 if any(Path(entry["path"]).resolve().is_relative_to(selected) for entry in games):
                     return {"ok": False, "error": "选中的是游戏安装目录或其上级，请改选实际存档所在的文件夹"}
                 for other in games:
@@ -99,6 +131,7 @@ class Api:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "item": asdict(item)}
 
+    @_data_operation
     def open_item_folder(self, item_id: str) -> dict:
         item = find_item(load(ROOT), item_id)
         if not item:
@@ -112,6 +145,7 @@ class Api:
             return {"ok": False, "error": f"无法打开存档文件夹\n{e}"}
         return {"ok": True}
 
+    @_data_operation
     def rename_item(self, item_id: str, name: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -121,6 +155,7 @@ class Api:
         save(ROOT, cfg)
         return {"ok": True}
 
+    @_data_operation
     def remove_item(self, item_id: str) -> dict:
         try:
             drop_managed(ROOT, item_id)
@@ -130,6 +165,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def graph(self, item_id: str, hide_auto: bool) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -144,6 +180,7 @@ class Api:
         g["summary_supported"] = it.steam_app_id == ONIMUSHA_APP_ID
         return g
 
+    @_data_operation
     def node_summary(self, item_id: str, commit_id: str) -> dict:
         it = find_item(load(ROOT), item_id)
         if not it:
@@ -156,6 +193,7 @@ class Api:
             return {"ok": False, "error": str(e)}
         return {"ok": True, **summary}
 
+    @_data_operation
     def restore(self, item_id: str, commit_id: str, fork: bool) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -167,6 +205,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def create_line(self, item_id: str, commit_id: str, name: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -179,6 +218,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def tag(self, item_id: str, commit_id: str, name: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -193,6 +233,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def set_note(self, item_id: str, commit_id: str, text: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -204,6 +245,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def rename_line(self, item_id: str, old: str, new: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -221,6 +263,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def delete_line(self, item_id: str, name: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -232,6 +275,7 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    @_data_operation
     def delete_node(self, item_id: str, commit_id: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -246,6 +290,7 @@ class Api:
             save(ROOT, cfg)
         return {"ok": True}
 
+    @_data_operation
     def pause_item(self, item_id: str, paused: bool) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -257,9 +302,10 @@ class Api:
 
     def pause_all(self, paused: bool) -> dict:
         self._pause_all = bool(paused)
-        self.scheduler.set_pause_all(self._pause_all)
+        self._scheduler.set_pause_all(self._pause_all)
         return {"ok": True, "paused": self._pause_all}
 
+    @_data_operation
     def backup_now(self, item_id: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -267,6 +313,7 @@ class Api:
             return {"ok": False, "error": "没有找到这份存档"}
         return {"ok": True, **backup_once(ROOT, it)}
 
+    @_data_operation
     def save_now(self, item_id: str) -> dict:
         cfg = load(ROOT)
         it = find_item(cfg, item_id)
@@ -275,13 +322,22 @@ class Api:
         return do_save_now(ROOT, it)
 
     def graph_rev(self) -> dict:
-        return {"rev": self.scheduler.generation}
+        return {"rev": self._scheduler.generation}
 
 
 def main() -> None:
     if not webview2_installed():
         ctypes.windll.user32.MessageBoxW(None, WEBVIEW2_HELP, APP_TITLE, 0x10)
         return
+    global ROOT
+    with lock_backup_instance(DEFAULT_ROOT):
+        ROOT = backup_root(DEFAULT_ROOT)
+        if ROOT != DEFAULT_ROOT and not ROOT.is_dir():
+            raise ValueError(f"备份目录暂不可用，请连接存放备份的磁盘后重试。\n{ROOT}")
+        _run_app()
+
+
+def _run_app() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     scheduler = Scheduler(ROOT)
     scheduler.start()
@@ -310,8 +366,10 @@ def main() -> None:
     threading.Thread(target=icon.run, daemon=True).start()
 
     webview.create_window(APP_TITLE, str(UI), js_api=api, width=1100, height=720)
-    webview.start()
-    scheduler.stop()
+    try:
+        webview.start()
+    finally:
+        scheduler.stop()
 
 
 if __name__ == "__main__":

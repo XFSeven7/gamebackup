@@ -8,6 +8,7 @@
   const api = {
     list_items: async () => (empty ? [] : D.items),
     scan_steam_games: async () => [],
+    backup_location: async () => ({ path: "%LOCALAPPDATA%\\gamebackup" }),
     graph: async (id, hideAuto) => {
       const key = id + ":" + (hideAuto ? "1" : "0");
       return D.graphs[key] || { ok: false, error: "没有找到这份存档" };

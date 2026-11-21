@@ -38,6 +38,8 @@ function ask(opts) {
     $("dlgMsg").textContent = opts.message;
     const isPrompt = opts.kind === "prompt";
     const isAlert = opts.kind === "alert";
+    $("dlgOk").textContent = opts.okLabel || "确定";
+    cancel.textContent = opts.cancelLabel || "取消";
     inp.hidden = !isPrompt;
     cancel.hidden = isAlert;
     if (isPrompt) inp.value = opts.value || "";
@@ -752,6 +754,41 @@ async function addFolder(game) {
   }
 }
 
+async function openSettings() {
+  try {
+    const location = await api().backup_location();
+    const change = await ask({
+      kind: "confirm",
+      message: `当前备份位置\n${location.path}\n\n更改位置时，已有备份和历史会一起迁移。`,
+      okLabel: "更改位置",
+      cancelLabel: "关闭",
+    });
+    if (!change) return;
+    const destination = await api().pick_folder(location.path);
+    if (!destination || destination === location.path) return;
+    const confirmed = await ask({
+      kind: "confirm",
+      message: `将全部备份迁移到以下空文件夹？\n${destination}`,
+      okLabel: "迁移备份",
+    });
+    if (!confirmed) return;
+
+    setBusy(true, "正在迁移并校验备份…");
+    let result;
+    try {
+      result = await api().move_backup_location(destination);
+    } finally {
+      setBusy(false);
+    }
+    if (!result.ok) return askOk(result.error);
+    await refreshItems();
+    if (selectedId) await loadGraph();
+    await askOk(result.warning || `备份已迁移到\n${result.path}`);
+  } catch {
+    await askOk("无法完成备份位置操作，请在设置中查看当前路径。");
+  }
+}
+
 async function renameItem(id, old) {
   const name = await askText("游戏叫什么名字？", old);
   if (!name) return;
@@ -891,6 +928,7 @@ document.addEventListener("click", () => {
 $("btnAdd").onclick = () => addFolder();
 $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
+$("btnSettings").onclick = openSettings;
 $("saveSummary").addEventListener("toggle", () => {
   if (graphData && !$("graphWrap").hidden) fitView();
 });
@@ -906,7 +944,7 @@ $("saveSummarySlot").onchange = (e) => {
   renderSaveSlot(slot);
 };
 $("btnSaveNow").onclick = async () => {
-  if (Date.now() < swallowEnterUntil) return;
+  if (Date.now() < swallowEnterUntil || !$("busy").hidden) return;
   if (!selectedId) return askOk("先选一个游戏");
   $("btnSaveNow").blur();
   setBusy(true, "正在保存…");

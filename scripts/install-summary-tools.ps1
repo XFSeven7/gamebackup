@@ -1,9 +1,19 @@
 $ErrorActionPreference = "Stop"
 
-$BackupRoot = if ($env:GAMEBACKUP_ROOT) {
-    $env:GAMEBACKUP_ROOT
+$DefaultRoot = if ($env:GAMEBACKUP_ROOT) {
+    [IO.Path]::GetFullPath($env:GAMEBACKUP_ROOT)
 } else {
     Join-Path $env:LOCALAPPDATA "gamebackup"
+}
+$LocationFile = Join-Path (Split-Path -Parent $DefaultRoot) ((Split-Path -Leaf $DefaultRoot) + "-location.json")
+$BackupRoot = if (Test-Path -LiteralPath $LocationFile) {
+    $ConfiguredRoot = (Get-Content -LiteralPath $LocationFile -Raw -Encoding UTF8 | ConvertFrom-Json).backup_root
+    if (-not $ConfiguredRoot -or -not (Test-Path -LiteralPath $ConfiguredRoot -PathType Container)) {
+        throw "Configured backup folder is unavailable."
+    }
+    $ConfiguredRoot
+} else {
+    $DefaultRoot
 }
 $ToolsDir = Join-Path $BackupRoot "tools"
 $Files = @(
