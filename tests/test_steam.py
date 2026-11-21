@@ -64,17 +64,32 @@ class SteamScanTest(unittest.TestCase):
             first_path = make_manifest(root, "100", "Alpha")
             second_path = make_manifest(second, "200", '测试 "游戏"')
             legacy_path = make_manifest(legacy, "300", "Legacy")
+            roaming = Path(tmp) / "Roaming"
+            save_dirs = []
+            for account, app_id, relative, location in (
+                ("42", "100", "win64_save/slot.bin", root / "userdata" / "42" / "100" / "remote"),
+                ("42", "200", "GameSave/slot.sav", roaming),
+                ("42", "300", "save/slot.bin", root / "userdata" / "42" / "300" / "remote"),
+                ("43", "300", "save/slot.bin", root / "userdata" / "43" / "300" / "remote"),
+            ):
+                file = location / relative
+                file.parent.mkdir(parents=True)
+                file.write_bytes(b"progress")
+                save_dirs.append(str(file.parent))
+                cache = root / "userdata" / account / app_id / "remotecache.vdf"
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                cache.write_text(vdf.dumps({app_id: {relative: {"size": "8"}}}, pretty=True), encoding="utf-8")
             make_manifest(second, "100", "Duplicate")
             make_manifest(second, "400", "Uninstalled", installed=False)
             make_manifest(legacy, "228980", "Steamworks Common Redistributables")
             (root / "steamapps" / "appmanifest_500.acf").write_text('"AppState"\n{', encoding="utf-8")
 
-            with patch("steam._steam_root", return_value=root):
+            with patch("steam._steam_root", return_value=root), patch.dict("os.environ", APPDATA=str(roaming)):
                 games = scan_installed_games()
             self.assertEqual(games, [
-                {"app_id": "100", "name": "Alpha", "path": first_path},
-                {"app_id": "300", "name": "Legacy", "path": legacy_path},
-                {"app_id": "200", "name": '测试 "游戏"', "path": second_path},
+                {"app_id": "100", "name": "Alpha", "path": first_path, "save_path": save_dirs[0]},
+                {"app_id": "300", "name": "Legacy", "path": legacy_path, "save_path": ""},
+                {"app_id": "200", "name": '测试 "游戏"', "path": second_path, "save_path": save_dirs[1]},
             ])
 
     def test_no_steam_installation_returns_empty_list(self):
