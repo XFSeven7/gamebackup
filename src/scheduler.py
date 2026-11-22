@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 
 from backup import backup_once
-from config import load
+from config import DEFAULT_INTERVAL_SEC, load
 
 
 class Scheduler:
@@ -61,5 +61,5 @@ class Scheduler:
                         self.on_tick()
                 interval = max(10, load(self.root).interval_sec)
             except Exception:
-                interval = 15
+                interval = DEFAULT_INTERVAL_SEC
             self._arm(interval)

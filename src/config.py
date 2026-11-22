@@ -8,6 +8,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
+DEFAULT_INTERVAL_SEC = 120
+
+
 @dataclass
 class ManagedFolder:
     id: str
@@ -21,7 +24,7 @@ class ManagedFolder:
 
 @dataclass
 class AppConfig:
-    interval_sec: int = 15
+    interval_sec: int = DEFAULT_INTERVAL_SEC
     items: list[ManagedFolder] = field(default_factory=list)
 
 
@@ -35,11 +38,10 @@ def load(root: Path) -> AppConfig:
         return AppConfig()
     raw = json.loads(p.read_text(encoding="utf-8"))
     items = [ManagedFolder(**it) for it in raw.get("items", [])]
-    interval = int(raw.get("interval_sec", 15))
-    # ponytail: 旧默认 60s，没有设置项；只迁这一档，别动用户以后可能设的更长间隔。
-    if interval == 60:
-        interval = 15
-        cfg = AppConfig(interval_sec=interval, items=items)
+    interval = int(raw.get("interval_sec", DEFAULT_INTERVAL_SEC))
+    # 迁移旧版的两个默认值，保留其余自定义间隔。
+    if interval in (15, 60):
+        cfg = AppConfig(items=items)
         save(root, cfg)
         return cfg
     return AppConfig(interval_sec=interval, items=items)
