@@ -20,11 +20,9 @@ from zipfile import BadZipFile, ZipFile
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-MANIFEST_URL = "https://raw.githubusercontent.com/XFSeven7/gamebackup-support/main/manifest.json"
-_ASSET = re.compile(
-    r"https://github\.com/XFSeven7/gamebackup-support/releases/download/"
-    r"[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}/[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.zip"
-)
+from updater import REPOSITORY
+
+MANIFEST_URL = f"https://raw.githubusercontent.com/{REPOSITORY}/main/game-support/manifest.json"
 _ASSET_HOSTS = {"release-assets.githubusercontent.com", "objects.githubusercontent.com"}
 _ID = re.compile(r"[a-z][a-z0-9_]{0,47}", re.ASCII)
 _VERSION = re.compile(r"(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})", re.ASCII)
@@ -45,11 +43,14 @@ def parse_version(value: object) -> tuple[int, int, int] | None:
     return None
 
 
-def _approved_asset_url(url: str) -> bool:
-    if _ASSET.fullmatch(url):
-        return True
+def support_asset_url(pack_id: str, version: str) -> str:
+    name = f"{pack_id}-v{version}"
+    return f"https://github.com/{REPOSITORY}/releases/download/support-{name}/{name}.zip"
+
+
+def _approved_asset_url(url: str, expected_url: str) -> bool:
     parsed = urlsplit(url)
-    return parsed.scheme == "https" and parsed.netloc in _ASSET_HOSTS
+    return url == expected_url or (parsed.scheme == "https" and parsed.netloc in _ASSET_HOSTS)
 
 
 class _TrustedRedirect(HTTPRedirectHandler):
@@ -77,7 +78,7 @@ def _download(url: str, limit: int, allowed) -> bytes:
     return bytes(data)
 
 
-def _descriptor(data: object) -> dict | None:
+def _descriptor(data: object, *, installed: bool = False) -> dict | None:
     if not isinstance(data, dict):
         return None
     keys = ("id", "version", "api_min", "api_max", "url", "sha256", "signature")
@@ -88,10 +89,15 @@ def _descriptor(data: object) -> dict | None:
         isinstance(pack_id, str) and _ID.fullmatch(pack_id) and not _IS_RESERVED(pack_id)
         and parse_version(version) is not None and type(api_min) is int and type(api_max) is int
         and 1 <= api_min <= api_max
-        and isinstance(url, str) and _ASSET.fullmatch(url)
+        and isinstance(url, str)
         and isinstance(checksum, str) and re.fullmatch(r"[0-9a-f]{64}", checksum)
         and isinstance(signature, str) and len(signature) == 88
     ):
+        return None
+    # Existing receipts remain usable. New downloads only use the current feed.
+    name = f"{pack_id}-v{version}"
+    previous_url = f"https://github.com/XFSeven7/gamebackup-support/releases/download/{name}/{name}.zip"
+    if url != support_asset_url(pack_id, version) and not (installed and url == previous_url):
         return None
     try:
         if len(base64.b64decode(signature, validate=True)) != 64:
@@ -213,7 +219,7 @@ def verified_installed_descriptor(path: Path, public_key: bytes) -> dict | None:
     try:
         if not path.is_dir() or path.is_symlink() or path.resolve().parent != path.parent.resolve():
             return None
-        row = _descriptor(json.loads(_read_limited(path / ".pack-receipt.json", 4096)))
+        row = _descriptor(json.loads(_read_limited(path / ".pack-receipt.json", 4096)), installed=True)
         if row is None or (row["id"], row["version"]) != (path.parent.name, path.name):
             return None
         data = _read_limited(path / ".pack.zip", _ARCHIVE_LIMIT)
@@ -231,7 +237,8 @@ def _install(pack_root: Path, row: dict, key: Ed25519PublicKey, validate) -> Pat
     target = game / row["version"]
     if target.exists() or game.is_symlink() or game.resolve().parent != pack_root.resolve():
         return None
-    data = _download(row["url"], _ARCHIVE_LIMIT, _approved_asset_url)
+    url = row["url"]
+    data = _download(url, _ARCHIVE_LIMIT, lambda target: _approved_asset_url(target, url))
     _authenticate(data, row, key)
     game.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".install-", dir=game) as workspace, ZipFile(io.BytesIO(data)) as archive:

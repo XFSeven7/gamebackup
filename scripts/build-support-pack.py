@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from game_support import BUNDLED_SUPPORT, SUPPORT_PUBLIC_KEY
+from support_updates import support_asset_url
 
 
 def main() -> None:
@@ -22,7 +23,7 @@ def main() -> None:
     parser.add_argument("id", choices=sorted(path.name for path in BUNDLED_SUPPORT.iterdir() if (path / "support.json").is_file()))
     parser.add_argument("--key", type=Path, default=default_key)
     parser.add_argument("--out", type=Path, default=ROOT / "dist" / "game-support")
-    parser.add_argument("--previous-manifest", type=Path)
+    parser.add_argument("--previous-manifest", type=Path, default=ROOT / "game-support" / "manifest.json")
     args = parser.parse_args()
 
     source = BUNDLED_SUPPORT / args.id
@@ -42,7 +43,7 @@ def main() -> None:
     data = output.read_bytes()
     entry = {
         **identity,
-        "url": f"https://github.com/XFSeven7/gamebackup-support/releases/download/{tag}/{output.name}",
+        "url": support_asset_url(args.id, metadata["version"]),
         "sha256": hashlib.sha256(data).hexdigest(),
         "signature": base64.b64encode(private_key.sign(data)).decode("ascii"),
     }

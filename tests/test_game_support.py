@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from game_support import GameSupportRegistry
-from support_updates import MANIFEST_URL
+from support_updates import MANIFEST_URL, support_asset_url
 
 
 class GameSupportTest(unittest.TestCase):
@@ -45,7 +45,7 @@ def major_events(*args):
     return []
 """)
             data = buffer.getvalue()
-            url = f"https://github.com/XFSeven7/gamebackup-support/releases/download/onimusha-v{version}/onimusha.zip"
+            url = support_asset_url("onimusha", version)
             responses[url] = data
             rows.append({
                 **{key: metadata[key] for key in ("id", "version", "api_min", "api_max")},

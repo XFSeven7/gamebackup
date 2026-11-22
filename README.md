@@ -90,7 +90,7 @@ powershell -File scripts/build.ps1
 python scripts/build-support-pack.py onimusha
 ```
 
-脚本生成带版本的 ZIP 和 `manifest.json`，使用当前用户的专用签名密钥，也可用 `--key` 指定密钥路径。发布时，将 ZIP 上传到 `XFSeven7/gamebackup-support` 对应版本标签的 Release，再将合并后的清单更新到该仓库的 `main`。用 `--previous-manifest` 传入上一份清单，可以保留其他游戏和仍受旧应用支持的版本。签名私钥应单独保管，应用只内置公钥。
+脚本生成带版本的 ZIP 和 `manifest.json`，使用当前用户的专用签名密钥，也可用 `--key` 指定密钥路径。将 ZIP 上传到本仓库对应的支持包标签，例如 `support-onimusha-v1.1.0`，发布为预发行版。附件上线后，用生成的清单更新 `main` 分支的 `game-support/manifest.json`。脚本默认合并该清单，保留其他游戏和仍受旧应用支持的版本。应用本体继续使用 `v1.x.y` 正式 Release。签名私钥应单独保管，应用只内置公钥。
 
 支持包用相对导入维护独立包结构。必需入口为 `summarize`、`read_event_state` 和 `major_events`。可选的分支索引入口接受包版本作为缓存命名空间。布局用 `tabs`、`sections`、`labels` 和 `branch_labels` 配置现有组件。
 
