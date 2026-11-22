@@ -268,7 +268,7 @@ async function loadGraph() {
     $("btnFit").hidden = true;
     return;
   }
-  const expandedBossNodes = hideAuto && graphData?.boss_indexing && !g.boss_indexing
+  const expandedProgressNodes = hideAuto && graphData?.boss_indexing && !g.boss_indexing
     && graphData.nodes.length !== g.nodes.length;
   graphData = g;
   if (selectedNode) {
@@ -279,16 +279,19 @@ async function loadGraph() {
   $("btnFit").hidden = false;
   renderGraph(g);
   setBossTabsAvailable(Boolean(g.boss_progress_supported && g.current_id));
-  if (lastFitItem !== selectedId || expandedBossNodes) {
+  if (lastFitItem !== selectedId || expandedProgressNodes) {
     lastFitItem = selectedId;
     fitView();
   }
 }
 
+const saveTabs = Array.from($("saveSummaryTabs").querySelectorAll('[role="tab"]'));
+
 function activateSaveTab(tabId) {
-  const bossSelected = tabId === "tabBossProgress" && !$("saveSummaryTabs").hidden;
-  for (const [id, active] of [["tabSaveOverview", !bossSelected], ["tabBossProgress", bossSelected]]) {
-    const tab = $(id);
+  if ($("saveSummaryTabs").hidden) tabId = "tabSaveOverview";
+  if ($(tabId).getAttribute("aria-selected") !== "true") $("saveSummary").scrollTop = 0;
+  for (const tab of saveTabs) {
+    const active = tab.id === tabId;
     tab.setAttribute("aria-selected", String(active));
     tab.tabIndex = active ? 0 : -1;
     $(tab.getAttribute("aria-controls")).hidden = !active;
@@ -314,6 +317,43 @@ function renderBossProgress(bosses, unlockedCount) {
     </li>`).join("");
 }
 
+function renderAchievements(achievements) {
+  const unlocked = achievements.filter((entry) => entry.unlocked).length;
+  const readable = achievements.some((entry) => entry.unlocked !== null);
+  $("achievementStatus").textContent = readable
+    ? `本地成就 · 已解锁 ${unlocked}/${achievements.length}`
+    : "这份存档没有可读取的成就进度。";
+  $("achievementRetry").hidden = true;
+  $("achievementFilters").hidden = !readable;
+  $("achievementList").innerHTML = achievements.map(({name, description, target, value, unlocked}) => {
+    const status = unlocked ? "已解锁" : value === null ? "无进度记录" :
+      target === 1 ? "未解锁" : `${value}/${target}`;
+    const bar = value === null
+      ? '<span class="achievement-track" aria-hidden="true"></span>'
+      : `<progress class="achievement-track" aria-label="${escapeHtml(name)}" value="${value}" max="${target}"></progress>`;
+    return `
+      <li class="achievement-row" data-completion="${unlocked === null ? "unknown" : unlocked ? "complete" : "incomplete"}">
+        <div class="achievement-title"><strong>${escapeHtml(name)}</strong><span>${status}</span></div>
+        <p>${escapeHtml(description)}</p>
+        ${bar}
+      </li>`;
+  }).join("");
+  applyAchievementFilter();
+}
+
+function applyAchievementFilter() {
+  const filters = $("achievementFilters");
+  const filter = filters.hidden ? "all" : filters.querySelector("input:checked").value;
+  let visible = 0;
+  for (const row of $("achievementList").children) {
+    row.hidden = filter !== "all" && row.dataset.completion !== filter;
+    if (!row.hidden) visible++;
+  }
+  const empty = $("achievementEmpty");
+  empty.hidden = filter === "all" || visible > 0;
+  empty.textContent = empty.hidden ? "" : filter === "complete" ? "没有已完成的成就。" : "没有未完成的成就。";
+}
+
 function hideSaveSummary() {
   $("saveSummary").hidden = true;
   summaryKey = "";
@@ -327,6 +367,11 @@ function showSaveSummaryMessage(message, retry = false) {
   $("bossProgressStatus").textContent = message;
   $("bossProgressRetry").hidden = !retry;
   $("bossProgressList").replaceChildren();
+  $("achievementStatus").textContent = message;
+  $("achievementRetry").hidden = !retry;
+  $("achievementFilters").hidden = true;
+  $("achievementEmpty").hidden = true;
+  $("achievementList").replaceChildren();
   $("saveSummarySlotLabel").hidden = true;
   $("saveSummaryBody").replaceChildren();
 }
@@ -427,8 +472,10 @@ async function loadSaveSummary(g) {
   summarySlots = result.slots || [];
   if (!summarySlots.length) {
     showSaveSummaryMessage("这版备份没有可读取的存档槽。");
+    if (result.achievements) renderAchievements(result.achievements);
     return;
   }
+  renderAchievements(result.achievements || []);
   $("saveSummaryStatus").hidden = true;
   const select = $("saveSummarySlot");
   select.replaceChildren(...summarySlots.map((slot) => new Option(slot.label, slot.index)));
@@ -437,6 +484,13 @@ async function loadSaveSummary(g) {
   select.value = slot.index;
   summarySlotIndex = slot.index;
   renderSaveSlot(slot);
+}
+
+const PROGRESS_LABEL_LENGTH = 24;
+const PROGRESS_LABEL_WIDTH = 350;
+
+function hasWideMilestone(node) {
+  return node.event_phase === "after" || Boolean(node.progress_milestones?.length);
 }
 
 function layout(g) {
@@ -524,11 +578,16 @@ function layout(g) {
   const COL_GAP = 36;
   const FORK_GAP = 200;
   const gapAfter = Array.from({ length: Math.max(cols, 1) }, () => COL_GAP);
+  const rightmostCol = new Map();
   nodes.forEach((n) => {
-    nodes.forEach((m) => {
-      if (rowOf[n.id] !== rowOf[m.id]) return;
-      if (colOf[m.id] === colOf[n.id] + 1) gapAfter[colOf[n.id]] = FORK_GAP;
-    });
+    const row = rowOf[n.id];
+    rightmostCol.set(row, Math.max(rightmostCol.get(row) ?? 0, colOf[n.id]));
+  });
+  nodes.forEach((n) => {
+    const col = colOf[n.id];
+    if (col >= rightmostCol.get(rowOf[n.id])) return;
+    const gap = hasWideMilestone(n) ? PROGRESS_LABEL_WIDTH : FORK_GAP;
+    gapAfter[col] = Math.max(gapAfter[col], gap);
   });
   const colX = [0];
   for (let i = 1; i < cols; i++) colX[i] = colX[i - 1] + gapAfter[i - 1];
@@ -537,7 +596,7 @@ function layout(g) {
 
 function layoutKey(g) {
   const nodes = (g.nodes || [])
-    .map((n) => `${n.id}:${(n.parents || []).join(",")}`)
+    .map((n) => `${n.id}:${(n.parents || []).join(",")}:${hasWideMilestone(n)}`)
     .sort()
     .join("|");
   return nodes;
@@ -608,9 +667,9 @@ function fitView() {
   let minX = 0, maxX = graphSize.w, minY = 0, maxY = graphSize.h;
   if (pts.length) {
     minX = Math.min(...pts.map((p) => p.x)) - 20;
-    maxX = Math.max(...pts.map((p) => p.x)) + 210;
+    maxX = Math.max(...pts.map((p) => p.right));
     minY = Math.min(...pts.map((p) => p.y)) - 40;
-    maxY = Math.max(...pts.map((p) => p.y)) + 28;
+    maxY = Math.max(...pts.map((p) => p.bottom));
   }
   const cw = Math.max(maxX - minX, 1);
   const ch = Math.max(maxY - minY, 1);
@@ -738,11 +797,31 @@ function renderGraph(g) {
   const COL_W = 36;
   const ROW_H = 56;
   const LABEL_W = 300;
+  const LINE_H = 18;
   const rowVals = Object.values(rowOf);
   const rows = rowVals.length ? Math.max(...rowVals) + 1 : 1;
   const lastX = cols ? (colX && colX[cols - 1] != null ? colX[cols - 1] : (cols - 1) * COL_W) : 0;
+  const rowExtra = Array(rows).fill(0);
+  const nodeLabels = new Map();
+  nodes.forEach((n) => {
+    const reasons = new Set(n.event_phase === "after" && n.event_label ? n.event_label.split("；") : []);
+    const event = formatEventMilestone(n);
+    const boss = n.boss_milestone ? formatBossMilestone(n.boss_milestone, reasons) : "";
+    const progress = (n.progress_milestones || []).map(({text}) => text)
+      .filter((text) => !reasons.has(text.replace(/^战斗成就：/, "成就解锁：")));
+    const milestones = [event, boss, ...progress].filter(Boolean);
+    const showRemark = !milestones.length || Boolean(n.note || n.tags?.length);
+    const extra = (milestones.length + Number(showRemark) - 1) * LINE_H;
+    nodeLabels.set(n.id, { milestones, showRemark, extra, wide: hasWideMilestone(n) });
+    const row = rowOf[n.id];
+    rowExtra[row] = Math.max(rowExtra[row], extra);
+  });
+  const rowY = [PAD_TOP];
+  rowExtra.forEach((extra, row) => {
+    rowY.push(rowY[row] + ROW_H + extra);
+  });
   const W = Math.max(400, PAD_LEFT + lastX + LABEL_W);
-  const H = Math.max(220, PAD_TOP + rows * ROW_H + PAD_BOTTOM);
+  const H = Math.max(220, rowY[rows] + PAD_BOTTOM);
   const svg = $("graph");
   svg.removeAttribute("viewBox");
   svg.removeAttribute("width");
@@ -750,11 +829,17 @@ function renderGraph(g) {
   svg.classList.toggle("hide-remarks", !showRemarks);
   svg.setAttribute("overflow", "visible");
   const x = (id) => PAD_LEFT + ((colX && colX[colOf[id]]) != null ? colX[colOf[id]] : colOf[id] * COL_W);
-  const y = (id) => PAD_TOP + rowOf[id] * ROW_H;
+  const y = (id) => rowY[rowOf[id]];
   graphSize = { w: W, h: H };
   nodePos = {};
   nodes.forEach((n) => {
-    nodePos[n.id] = { x: x(n.id), y: y(n.id) };
+    const { wide, extra } = nodeLabels.get(n.id);
+    nodePos[n.id] = {
+      x: x(n.id),
+      y: y(n.id),
+      right: x(n.id) + (wide ? PROGRESS_LABEL_WIDTH : 210),
+      bottom: y(n.id) + 28 + extra,
+    };
   });
   let edges = "";
   nodes.forEach((n) => {
@@ -782,21 +867,27 @@ function renderGraph(g) {
     const isCur = n.id === g.current_id;
     const isStart = startIds.has(n.id);
     const onPicked = picked.has(n.id);
-    const milestone = n.boss_milestone;
-    const r = n.auto && !milestone ? 5 : 7;
-    const fill = isCur ? "#e6b325" : milestone ? "var(--accent)" : isStart ? "#6cbe8a" : "#777";
+    const { milestones, showRemark, extra, wide } = nodeLabels.get(n.id);
+    const hasMilestone = milestones.length > 0;
+    const r = n.auto && !hasMilestone ? 5 : 7;
+    const fill = isCur ? "#e6b325" : hasMilestone ? "var(--accent)" : isStart ? "#6cbe8a" : "#777";
     const remark = isStart ? "起始存档" : nodeRemark(n);
-    const bossLabel = milestone ? formatBossMilestone(milestone) : "";
-    const showRemark = !milestone || n.note || n.tags?.length;
-    const separateNote = milestone && showRemark;
+    const labelX = x(n.id) + 14;
+    const labelY = y(n.id) - 4;
+    const milestoneText = milestones.map((text, i) => {
+      const label = wide ? clip(text, PROGRESS_LABEL_LENGTH) : text;
+      return `<text class="milestone-mark" x="${labelX}" y="${labelY + i * LINE_H}" font-size="13" font-weight="700">${escapeHtml(label)}</text>`;
+    }).join("");
+    const title = wide ? `<title>${escapeHtml(milestones.join("\n"))}</title>` : "";
     const badge = isCur ? "正在用" : "";
-    const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="12" text-rendering="geometricPrecision">${badge}</text>` : "";
-    dots += `<g class="node${n.auto ? " auto" : ""}${milestone ? " boss-milestone" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
+    const curTxt = badge ? `<text x="${labelX}" y="${y(n.id) - 22}" fill="#e6b325" font-size="12" text-rendering="geometricPrecision">${badge}</text>` : "";
+    dots += `<g class="node${n.auto ? " auto" : ""}${hasMilestone ? " milestone" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
+      ${title}
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" stroke-width="${sel ? 2.5 : 0}" />
       ${curTxt}
-      ${bossLabel ? `<text class="boss-mark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" font-size="13" font-weight="700">${escapeHtml(bossLabel)}</text>` : ""}
-      ${showRemark ? `<text class="remark" x="${x(n.id) + 14}" y="${y(n.id) + (separateNote ? 14 : -4)}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="13" font-weight="${sel ? 700 : 600}" text-rendering="geometricPrecision">${escapeHtml(remark)}</text>` : ""}
-      <text x="${x(n.id) + 14}" y="${y(n.id) + (separateNote ? 30 : 14)}" fill="#8a8a8a" font-size="12" text-rendering="geometricPrecision">${escapeHtml(formatTime(n.time))}</text>
+      ${milestoneText}
+      ${showRemark ? `<text class="remark" x="${labelX}" y="${labelY + extra}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="13" font-weight="${sel ? 700 : 600}" text-rendering="geometricPrecision">${escapeHtml(remark)}</text>` : ""}
+      <text x="${labelX}" y="${y(n.id) + 14 + extra}" fill="#8a8a8a" font-size="12" text-rendering="geometricPrecision">${escapeHtml(formatTime(n.time))}</text>
     </g>`;
   });
   svg.innerHTML = `<g id="graphCam" transform="translate(${cam.x} ${cam.y}) scale(${cam.k})">${edges}${dots}</g>`;
@@ -828,10 +919,17 @@ function renderGraph(g) {
   });
 }
 
-function formatBossMilestone({names, defeated}) {
-  const unlocked = names.filter((name) => !defeated.includes(name));
+function formatEventMilestone({event_phase, event_label}) {
+  if (event_phase === "before") return "事件前存档";
+  if (event_phase !== "after") return "";
+  return event_label ? `事件后 · ${event_label}` : "事件后存档";
+}
+
+function formatBossMilestone({names, defeated}, reasons) {
+  const victories = defeated.filter((name) => !reasons.has(`击败：${name}`));
+  const unlocked = names.filter((name) => !defeated.includes(name) && !reasons.has(`再战解锁：${name}`));
   return [
-    defeated.length ? `击败：${defeated.join("、")}` : "",
+    victories.length ? `击败：${victories.join("、")}` : "",
     unlocked.length ? `再战解锁：${unlocked.join("、")}` : "",
   ].filter(Boolean).join(" · ");
 }
@@ -1077,15 +1175,18 @@ $("btnAdd").onclick = () => addFolder();
 $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
 $("btnSettings").onclick = openSettings;
-$("tabSaveOverview").onclick = () => activateSaveTab("tabSaveOverview");
-$("tabBossProgress").onclick = () => activateSaveTab("tabBossProgress");
+for (const tab of saveTabs) tab.onclick = () => activateSaveTab(tab.id);
+$("achievementFilters").addEventListener("change", applyAchievementFilter);
 $("saveSummaryTabs").addEventListener("keydown", (e) => {
-  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  const index = saveTabs.indexOf(e.target);
+  if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
   e.preventDefault();
-  const boss = e.key === "End" || (e.key !== "Home" && e.target.id === "tabSaveOverview");
-  const tabId = boss ? "tabBossProgress" : "tabSaveOverview";
-  activateSaveTab(tabId);
-  $(tabId).focus();
+  let next = 0;
+  if (e.key === "End") next = saveTabs.length - 1;
+  if (e.key === "ArrowRight") next = (index + 1) % saveTabs.length;
+  if (e.key === "ArrowLeft") next = (index + saveTabs.length - 1) % saveTabs.length;
+  activateSaveTab(saveTabs[next].id);
+  saveTabs[next].focus();
 });
 $("btnBossProgress").onclick = (e) => {
   e.stopPropagation();
@@ -1096,7 +1197,7 @@ $("btnBossProgress").onclick = (e) => {
 $("saveSummary").addEventListener("toggle", () => {
   if (graphData && !$("graphWrap").hidden) fitView();
 });
-$("saveSummaryRetry").onclick = $("bossProgressRetry").onclick = () => {
+$("saveSummaryRetry").onclick = $("bossProgressRetry").onclick = $("achievementRetry").onclick = () => {
   if (!graphData) return;
   summaryKey = "";
   loadSaveSummary(graphData);

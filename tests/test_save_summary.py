@@ -49,17 +49,48 @@ class SaveSummaryTest(unittest.TestCase):
                     f"{slot}/_Data/_Items/0/EquipNum": 2 if earlier else 5,
                     f"{slot}/_Data/_Items/1/ItemID": 2,
                     f"{slot}/_Data/_Items/1/EquipNum": 1 if earlier else 0,
+                    f"{slot}/_Data/_Items/2/ItemID": 22384,
+                    f"{slot}/_Data/_Items/2/EquipNum": 1,
+                    f"{slot}/_Data/_Items/3/ItemID": 22649,
+                    f"{slot}/_Data/_Items/3/EquipNum": 0,
+                    f"{slot}/_Data/_Items/3/BoxNum": 0 if earlier else 1,
+                    f"{slot}/_Data/_Items/4/ItemID": 22384,
+                    f"{slot}/_Data/_Items/4/EquipNum": 0,
+                    f"{slot}/_Data/_Items/4/BoxNum": 1,
                     f"{slot}/_Data/_BossRematch/#d54d09c5/_MaxElement": 3,
                     f"{slot}/_Data/_BossRematch/#d54d09c5/_Value/0": 1 if earlier else 7,
                     f"{slot}/_Data/_BossRematch/BossID/0": 354,
                     f"{slot}/_Data/_BossRematch/BossID/1": 26515,
                     f"{slot}/_Data/_BossRematch/BossID/2": 28128,
+                    f"{slot}/_Data/#7efc175b/_ReleasedIndex/_MaxElement": 32,
+                    f"{slot}/_Data/#7efc175b/_ReleasedIndex/_Value/0": 1 if earlier else 5,
+                    f"{slot}/_Data/#62b8a2f4/_VisitArea/_MaxElement": 32,
+                    f"{slot}/_Data/#62b8a2f4/_VisitArea/_Value/0": 3 if earlier else 2,
+                    f"{slot}/_Data/_MysteryParam/#6858d6b7": 3 if earlier else 7,
+                    f"{slot}/_Data/_MysteryParam/#a9abfbb2": 1 if earlier else 3,
+                    f"{slot}/_Data/_StoryParam/#71379cfa/_MaxElement": 128,
+                    f"{slot}/_Data/_StoryParam/#71379cfa/_Value/0": 1 if earlier else (1 << 24) | 1,
+                    f"{slot}/_Data/_StoryParam/#71379cfa/_Value/1": 1 << 12,
+                    f"{slot}/_Data/_StoryParam/#71379cfa/_Value/2": 0 if earlier else 1 << 11,
+                    f"{slot}/_Data/_StoryParam/#71379cfa/_Value/3": 0,
+                    "/Root/_SystemSaveData/_Data/_Achievement/46/#78cfd7e7": 46,
+                    "/Root/_SystemSaveData/_Data/_Achievement/24/#78cfd7e7": 24,
+                    "/Root/_SystemSaveData/_Data/_Achievement/24/IsUnlocked": 0,
+                    "/Root/_SystemSaveData/_Data/_Achievement/46/IsUnlocked": 0 if earlier else 1,
+                    "/Root/_SystemSaveData/_Data/_Achievement/46/Count": 49 if earlier else 74,
+                    "/Root/_SystemSaveData/_Data/_Achievement/44/#78cfd7e7": 44,
+                    "/Root/_SystemSaveData/_Data/_Achievement/44/IsUnlocked": 0,
+                    "/Root/_SystemSaveData/_Data/_Achievement/44/Count": 20 if earlier else 40,
+                    "/Root/_SystemSaveData/_Data/_Achievement/50/#78cfd7e7": 50,
+                    "/Root/_SystemSaveData/_Data/_Achievement/50/IsUnlocked": 1,
                 }
                 return subprocess.CompletedProcess(args, 0, stdout=json.dumps(values))
 
             with patch("save_summary.subprocess.run", side_effect=parse_copy):
-                result = summarize_onimusha(repo, selected, tools)["slots"][0]
-                baseline = summarize_onimusha(repo, previous, tools)["slots"][0]
+                selected_summary = summarize_onimusha(repo, selected, tools)
+                previous_summary = summarize_onimusha(repo, previous, tools)
+                result = selected_summary["slots"][0]
+                baseline = previous_summary["slots"][0]
                 nodes = [node for node in graph(repo, False, "main")["nodes"] if node["id"] in {previous, selected}]
                 missing = onimusha_boss_nodes(repo, nodes, {})
                 self.assertEqual(len(missing), 2)
@@ -69,6 +100,16 @@ class SaveSummaryTest(unittest.TestCase):
                 indexed = {node["id"]: node.get("boss_milestone") for node in nodes}
                 self.assertEqual(indexed, {
                     selected: {"names": ["怒伐天", "怒伐天（强化）"], "defeated": ["怒伐天"]},
+                    previous: None,
+                })
+                progress = {node["id"]: node.get("progress_milestones") for node in nodes}
+                self.assertEqual(progress, {
+                    selected: [
+                        {"kind": "exploration", "text": "传送镜 +1（累计 2）"},
+                        {"kind": "mystery", "text": "异闻解锁 +1（累计 3）"},
+                        {"kind": "mystery", "text": "异闻已汇报 +1（累计 2）"},
+                        {"kind": "achievement", "text": "战斗成就：能赢就行"},
+                    ],
                     previous: None,
                 })
             self.assertEqual(result["goal"], "寻找父亲")
@@ -91,9 +132,27 @@ class SaveSummaryTest(unittest.TestCase):
             self.assertCountEqual(result["items"], [
                 {"id": 15508, "name": "砥石", "quantity": 5, "delta": 3},
                 {"id": 2, "name": "Unknown tool", "quantity": 0, "delta": -1},
+                {"id": 22384, "name": "幻魔杂记（一目笠）", "quantity": 1, "delta": 0},
             ])
             self.assertFalse(baseline["has_previous"])
             self.assertIsNone(baseline["items"][0]["delta"])
+            achievements = {entry["id"]: entry for entry in selected_summary["achievements"]}
+            self.assertEqual(len(achievements), 52)
+            self.assertEqual((achievements[16]["value"], achievements[16]["target"]), (2, 8))
+            self.assertEqual((achievements[18]["value"], achievements[18]["target"]), (1, 18))
+            self.assertEqual((achievements[23]["value"], achievements[23]["target"]), (2, 36))
+            self.assertEqual((achievements[24]["value"], achievements[24]["target"]), (2, 23))
+            self.assertEqual((achievements[44]["value"], achievements[44]["target"]), (40, 50))
+            self.assertEqual((achievements[46]["value"], achievements[46]["target"]), (50, 50))
+            self.assertTrue(achievements[46]["unlocked"])
+            self.assertEqual((achievements[50]["value"], achievements[50]["target"]), (1, 1))
+            self.assertIsNone(achievements[51]["value"])
+            previous_achievements = {entry["id"]: entry for entry in previous_summary["achievements"]}
+            self.assertEqual(previous_achievements[16]["value"], 0)
+            self.assertEqual(previous_achievements[23]["value"], 1)
+            self.assertEqual(previous_achievements[24]["value"], 1)
+            self.assertEqual(previous_achievements[44]["value"], 20)
+            self.assertEqual(previous_achievements[46]["value"], 49)
             self.assertEqual(save.read_bytes(), b"live edits")
 
     def test_unavailable_parser_reports_setup(self):

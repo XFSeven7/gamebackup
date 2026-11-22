@@ -52,7 +52,7 @@ class Scheduler:
                     cfg = load(self.root)
                     bumped = False
                     for item in cfg.items:
-                        r = backup_once(self.root, item)
+                        r = backup_once(self.root, item, events_only=True)
                         if not r.get("skipped"):
                             bumped = True
                     if bumped:

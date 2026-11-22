@@ -5,7 +5,7 @@
   --text: #e6e6e6;
   --muted: #9a9a9a;
   --accent: #3d8bfd;
-  --boss-mark: #8ab9ff;
+  --milestone-mark: #8ab9ff;
   --warn: #c45454;
   --current: #e6b325;
 }
@@ -105,7 +105,8 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 }
 #saveSummary:not([open]) > summary { padding: 6px 10px; }
 #saveSummaryTabs:not([hidden]) {
-  display: flex; margin: 0 14px 14px; border-bottom: 1px solid var(--line);
+  display: flex; position: sticky; top: 0; z-index: 1; background: var(--panel);
+  margin: 0 0 14px; padding: 0 14px; border-bottom: 1px solid var(--line);
 }
 #saveSummaryTabs button {
   flex: 1; padding: 6px 4px 8px; background: transparent; border: 0;
@@ -120,6 +121,7 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 #saveSummarySlotLabel:not([hidden]) {
   display: flex; gap: 8px; align-items: center; margin: 0 14px 12px;
 }
+#saveSummary:has(#tabAchievements[aria-selected="true"]) #saveSummarySlotLabel { display: none; }
 #saveSummarySlot {
   min-width: 0; flex: 1; padding: 4px; border: 1px solid var(--line);
   border-radius: 6px; background: var(--bg); color: var(--text);
@@ -173,6 +175,36 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 }
 .boss-timeline-event[data-unlocked]::before { background: var(--accent); }
 .boss-timeline-state { white-space: nowrap; color: var(--muted); font-size: 12px; }
+#achievementStatus { margin: 0 0 8px; color: var(--muted); }
+#achievementFilters:not([hidden]) {
+  display: flex; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 6px;
+}
+#achievementFilters label { position: relative; flex: 1; cursor: pointer; }
+#achievementFilters input { position: absolute; opacity: 0; }
+#achievementFilters span {
+  display: block; padding: 4px; border-radius: 4px; text-align: center;
+  color: var(--muted); font-size: 12px;
+}
+#achievementFilters label:hover span { color: var(--text); }
+#achievementFilters input:checked + span { background: var(--line); color: var(--text); font-weight: 600; }
+#achievementFilters input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+#achievementEmpty { margin: 12px 0 0; }
+.achievement-row {
+  display: grid; gap: 5px; padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.achievement-row[hidden] { display: none; }
+.achievement-row:last-child { border-bottom: 0; }
+.achievement-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.achievement-title span { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.achievement-row[data-completion="complete"] .achievement-title span { color: var(--milestone-mark); }
+.achievement-row p { margin: 0; color: var(--muted); font-size: 12px; }
+.achievement-track {
+  display: block; appearance: none; width: 100%; height: 5px;
+  background: var(--line); border: 0; border-radius: 3px; overflow: hidden;
+}
+.achievement-track::-webkit-progress-bar { background: var(--line); }
+.achievement-track::-webkit-progress-value { background: var(--accent); border-radius: 3px; }
+.achievement-track::-moz-progress-bar { background: var(--accent); border-radius: 3px; }
 #btnFit {
   position: absolute; right: 12px; bottom: 12px; z-index: 6;
   background: #2d2d2d; color: var(--text);
@@ -186,8 +218,8 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 #btnAddBig { font-size: 16px; padding: 10px 18px; }
 .node { cursor: pointer; }
 .node.auto { opacity: 0.45; }
-.node.boss-milestone { opacity: 1; }
-.node .boss-mark { fill: var(--boss-mark); }
+.node.milestone { opacity: 1; }
+.node .milestone-mark { fill: var(--milestone-mark); }
 .node.on-line { opacity: 1; }
 .node.selected circle { stroke: #fff; stroke-width: 2.5; }
 #graph.hide-remarks .remark { opacity: 0; pointer-events: none; }

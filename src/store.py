@@ -338,7 +338,9 @@ def filter_auto_nodes(g: dict, hide_auto: bool) -> dict:
         n["id"]
         for n in g["nodes"]
         if (not n["auto"])
+        or n.get("event_phase")
         or n.get("boss_milestone")
+        or n.get("progress_milestones")
         or n["id"] in tips
         or not n["parents"]
         or (not hide_auto)
@@ -404,6 +406,8 @@ def graph(path: Path, hide_auto: bool, current_line: str) -> dict:
 
     nodes = []
     seen: set[str] = set()
+    event_parents = set()
+    event_markers = {"[event-before]": "before", "[event-after]": "after"}
     for entry in Walker(repo.object_store, include):
         commit = entry.commit
         cid = _hex(commit.id)
@@ -414,6 +418,10 @@ def graph(path: Path, hide_auto: bool, current_line: str) -> dict:
         note_raw = porcelain.notes_show(_p(path), commit.id)
         note = note_raw.decode("utf-8", errors="replace") if note_raw else ""
         auto = msg.startswith("[auto]")
+        marker, _, event_label = msg.removeprefix("[auto] ").partition(" ")
+        event_phase = event_markers.get(marker) if auto else None
+        if event_phase == "after" and commit.parents:
+            event_parents.add(_hex(commit.parents[0]))
         fork = msg.startswith("[fork]")
         if not fork and not auto and commit.parents:
             try:
@@ -432,6 +440,12 @@ def graph(path: Path, hide_auto: bool, current_line: str) -> dict:
                 "tags": tags_on.get(cid, []),
             }
         )
+        if event_phase:
+            nodes[-1].update(event_phase=event_phase, event_label=event_label.strip())
+
+    for node in nodes:
+        if node["id"] in event_parents and "event_phase" not in node:
+            node.update(event_phase="before", event_label="")
 
     current_id = ""
     try:

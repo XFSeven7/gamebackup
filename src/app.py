@@ -19,6 +19,7 @@ import pystray
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
+from save_events import summary_kind as _summary_kind
 from save_summary import (
     load_onimusha_boss_index, onimusha_boss_nodes, save_onimusha_boss_index,
     scan_onimusha_boss_index, summarize_mortal_shell, summarize_onimusha,
@@ -33,19 +34,8 @@ DEFAULT_ROOT = default_backup_root()
 ROOT = backup_root(DEFAULT_ROOT)
 UI = ui_index()
 ICON_PATH = UI.with_name("gamebackup.ico")
-APP_VERSION = "v1.1.3"
+APP_VERSION = "v1.1.4"
 APP_TITLE = f"存档助手 {APP_VERSION}"
-ONIMUSHA_APP_ID = "2638890"
-
-
-def _summary_kind(item):
-    if item.steam_app_id == ONIMUSHA_APP_ID:
-        return "onimusha"
-    if tuple(part.casefold() for part in Path(item.path).parts[-3:]) == (
-        "mortalshell2", "saved", "savegames",
-    ):
-        return "mortal_shell"
-    return None
 
 
 def _icon_image() -> Image.Image:
