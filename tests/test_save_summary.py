@@ -7,8 +7,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from save_summary import summarize_onimusha
-from store import commit_manual, init_repo
+from save_summary import (
+    load_onimusha_boss_index, onimusha_boss_nodes, save_onimusha_boss_index,
+    scan_onimusha_boss_index, summarize_onimusha,
+)
+from store import commit_manual, graph, init_repo
 
 
 class SaveSummaryTest(unittest.TestCase):
@@ -40,7 +43,7 @@ class SaveSummaryTest(unittest.TestCase):
                 values = {
                     f"{slot}/_Data/_ResourceData/PlayTime": 1,
                     f"{slot}/_Data/_ResourceData/SoulAmount": 100 if earlier else 115,
-                    f"{slot}/Detail": f"11/21/2026 22:00:{'00' if earlier else '25'}\t009:35:23\t剑戟\t{'寺庙' if earlier else '寻找父亲'}",
+                    f"{slot}/Detail": f"11/21/2026 22:00:{'00' if earlier else '25'}\t009:35:23\t剑戟\t{'击败怒伐天' if earlier else '寻找父亲'}",
                     f"{slot}/Subtitle": "101\t清水寺",
                     f"{slot}/_Data/_Items/0/ItemID": 15508,
                     f"{slot}/_Data/_Items/0/EquipNum": 2 if earlier else 5,
@@ -57,10 +60,21 @@ class SaveSummaryTest(unittest.TestCase):
             with patch("save_summary.subprocess.run", side_effect=parse_copy):
                 result = summarize_onimusha(repo, selected, tools)["slots"][0]
                 baseline = summarize_onimusha(repo, previous, tools)["slots"][0]
+                nodes = [node for node in graph(repo, False, "main")["nodes"] if node["id"] in {previous, selected}]
+                missing = onimusha_boss_nodes(repo, nodes, {})
+                self.assertEqual(len(missing), 2)
+                index = scan_onimusha_boss_index(repo, tools, missing, lambda: False)
+                save_onimusha_boss_index(repo, index)
+                self.assertEqual(onimusha_boss_nodes(repo, nodes, load_onimusha_boss_index(repo)), set())
+                indexed = {node["id"]: node.get("boss_milestone") for node in nodes}
+                self.assertEqual(indexed, {
+                    selected: {"names": ["怒伐天", "怒伐天（强化）"], "defeated": ["怒伐天"]},
+                    previous: None,
+                })
             self.assertEqual(result["goal"], "寻找父亲")
             self.assertEqual(result["location"], "清水寺")
             self.assertEqual(result["play_time"], "009:35:23")
-            self.assertEqual(result["previous_goal"], "寺庙")
+            self.assertEqual(result["previous_goal"], "击败怒伐天")
             self.assertEqual(result["souls_delta"], 15)
             self.assertEqual(result["boss_progress"], [
                 {"name": "佐佐木巌流", "unlocked": True},

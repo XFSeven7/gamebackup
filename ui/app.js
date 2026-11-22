@@ -230,6 +230,7 @@ async function refreshItems() {
     selectedId = null;
     hideSaveSummary();
     setBossTabsAvailable(false);
+    $("bossIndexStatus").hidden = true;
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
@@ -242,6 +243,7 @@ async function selectItem(id) {
     setBossTabsAvailable(false);
     summarySlotIndex = null;
     graphData = null;
+    $("bossIndexStatus").hidden = true;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
   }
@@ -260,11 +262,14 @@ async function loadGraph() {
   if (!g.ok) {
     hideSaveSummary();
     setBossTabsAvailable(false);
+    $("bossIndexStatus").hidden = true;
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
     return;
   }
+  const expandedBossNodes = hideAuto && graphData?.boss_indexing && !g.boss_indexing
+    && graphData.nodes.length !== g.nodes.length;
   graphData = g;
   if (selectedNode) {
     selectedNode = (g.nodes || []).find((n) => n.id === selectedNode.id) || null;
@@ -274,7 +279,7 @@ async function loadGraph() {
   $("btnFit").hidden = false;
   renderGraph(g);
   setBossTabsAvailable(Boolean(g.boss_progress_supported && g.current_id));
-  if (lastFitItem !== selectedId) {
+  if (lastFitItem !== selectedId || expandedBossNodes) {
     lastFitItem = selectedId;
     fitView();
   }
@@ -723,6 +728,7 @@ function bindCanvas() {
 
 function renderGraph(g) {
   loadSaveSummary(g);
+  $("bossIndexStatus").hidden = !g.boss_indexing;
   const { nodes, colOf, rowOf, cols, colX } = getLayout(g);
   const current = onCurrentLine(g);
   const picked = selectedNode ? onNodeLine(nodes, selectedNode.id) : new Set();
@@ -776,16 +782,21 @@ function renderGraph(g) {
     const isCur = n.id === g.current_id;
     const isStart = startIds.has(n.id);
     const onPicked = picked.has(n.id);
-    const r = n.auto ? 5 : 7;
-    const fill = isCur ? "#e6b325" : isStart ? "#6cbe8a" : "#777";
+    const milestone = n.boss_milestone;
+    const r = n.auto && !milestone ? 5 : 7;
+    const fill = isCur ? "#e6b325" : milestone ? "var(--accent)" : isStart ? "#6cbe8a" : "#777";
     const remark = isStart ? "起始存档" : nodeRemark(n);
+    const bossLabel = milestone ? formatBossMilestone(milestone) : "";
+    const showRemark = !milestone || n.note || n.tags?.length;
+    const separateNote = milestone && showRemark;
     const badge = isCur ? "正在用" : "";
     const curTxt = badge ? `<text x="${x(n.id) + 14}" y="${y(n.id) - 20}" fill="#e6b325" font-size="12" text-rendering="geometricPrecision">${badge}</text>` : "";
-    dots += `<g class="node${n.auto ? " auto" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
+    dots += `<g class="node${n.auto ? " auto" : ""}${milestone ? " boss-milestone" : ""}${sel ? " selected" : ""}${onPicked ? " on-line" : ""}" id="n-${n.id}" data-id="${n.id}">
       <circle cx="${x(n.id)}" cy="${y(n.id)}" r="${r}" fill="${fill}" stroke="${sel ? "#fff" : "none"}" stroke-width="${sel ? 2.5 : 0}" />
       ${curTxt}
-      <text class="remark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="13" font-weight="${sel ? 700 : 600}" text-rendering="geometricPrecision">${escapeHtml(remark)}</text>
-      <text x="${x(n.id) + 14}" y="${y(n.id) + 14}" fill="#8a8a8a" font-size="12" text-rendering="geometricPrecision">${escapeHtml(formatTime(n.time))}</text>
+      ${bossLabel ? `<text class="boss-mark" x="${x(n.id) + 14}" y="${y(n.id) - 4}" font-size="13" font-weight="700">${escapeHtml(bossLabel)}</text>` : ""}
+      ${showRemark ? `<text class="remark" x="${x(n.id) + 14}" y="${y(n.id) + (separateNote ? 14 : -4)}" fill="${sel ? "#5aa2ff" : "#ddd"}" font-size="13" font-weight="${sel ? 700 : 600}" text-rendering="geometricPrecision">${escapeHtml(remark)}</text>` : ""}
+      <text x="${x(n.id) + 14}" y="${y(n.id) + (separateNote ? 30 : 14)}" fill="#8a8a8a" font-size="12" text-rendering="geometricPrecision">${escapeHtml(formatTime(n.time))}</text>
     </g>`;
   });
   svg.innerHTML = `<g id="graphCam" transform="translate(${cam.x} ${cam.y}) scale(${cam.k})">${edges}${dots}</g>`;
@@ -815,6 +826,14 @@ function renderGraph(g) {
       showMenu(e.clientX, e.clientY, acts);
     });
   });
+}
+
+function formatBossMilestone({names, defeated}) {
+  const unlocked = names.filter((name) => !defeated.includes(name));
+  return [
+    defeated.length ? `击败：${defeated.join("、")}` : "",
+    unlocked.length ? `再战解锁：${unlocked.join("、")}` : "",
+  ].filter(Boolean).join(" · ");
 }
 
 function renderSteamGames() {
@@ -1166,7 +1185,7 @@ onReady(async () => {
   if (api().update_ready) await api().update_ready();
   if (selectedId) await loadGraph();
   try {
-    graphRev = (await api().graph_rev()).rev;
+    if (!graphData?.boss_indexing) graphRev = (await api().graph_rev()).rev;
   } catch (e) {}
   setInterval(() => {
     pullGraphIfChanged();

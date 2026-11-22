@@ -338,6 +338,7 @@ def filter_auto_nodes(g: dict, hide_auto: bool) -> dict:
         n["id"]
         for n in g["nodes"]
         if (not n["auto"])
+        or n.get("boss_milestone")
         or n["id"] in tips
         or not n["parents"]
         or (not hide_auto)

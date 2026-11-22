@@ -187,6 +187,16 @@ def _onimusha_summary_tool(tools_dir: Path) -> Path:
     return executable
 
 
+def _new_onimusha_bosses(slot: dict | None, previous: dict | None) -> list[str]:
+    if slot is None or previous is None or slot["index"] != previous["index"]:
+        return []
+    old_locked = {boss["name"] for boss in previous["boss_progress"] or [] if not boss["unlocked"]}
+    return [
+        boss["name"] for boss in slot["boss_progress"] or []
+        if boss["unlocked"] and boss["name"] in old_locked
+    ]
+
+
 def summarize_onimusha(repo: Path, commit_id: str, tools_dir: Path) -> dict:
     executable = _onimusha_summary_tool(tools_dir)
     if not re.fullmatch(r"[0-9a-fA-F]{40}", commit_id):
@@ -236,20 +246,98 @@ def summarize_onimusha(repo: Path, commit_id: str, tools_dir: Path) -> dict:
             for item_id in inventory.keys() | old_inventory.keys()
         ]
         items.sort(key=lambda item: (item["name"].casefold(), item["id"]))
-        old_bosses = previous["boss_progress"] if previous is not None else None
-        old_locked = {boss["name"] for boss in old_bosses or [] if not boss["unlocked"]}
         summaries.append({
             **{key: value for key, value in slot.items() if key != "inventory"},
             "has_previous": previous is not None,
             "previous_goal": previous["goal"] if previous is not None else None,
             "souls_delta": souls - old_souls if souls is not None and old_souls is not None else None,
-            "boss_unlocked": [
-                boss["name"] for boss in slot["boss_progress"] or []
-                if boss["unlocked"] and boss["name"] in old_locked
-            ],
+            "boss_unlocked": _new_onimusha_bosses(slot, previous),
             "items": items,
         })
     return {"slots": summaries}
+
+
+_BOSS_INDEX = "gamebackup-onimusha-boss-v1.json"
+
+
+def load_onimusha_boss_index(repo: Path) -> dict:
+    try:
+        entries = json.loads((repo / ".git" / _BOSS_INDEX).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(entries, dict):
+        return {}
+    return {
+        key: slot for key, slot in entries.items()
+        if slot is None or (
+            isinstance(slot, dict) and type(slot.get("index")) is int
+            and isinstance(slot.get("goal"), str) and isinstance(slot.get("boss_progress"), list)
+            and all(
+                isinstance(boss, dict) and isinstance(boss.get("name"), str)
+                and type(boss.get("unlocked")) is bool for boss in slot["boss_progress"]
+            )
+        )
+    }
+
+
+def save_onimusha_boss_index(repo: Path, index: dict) -> None:
+    git_dir = repo / ".git"
+    with tempfile.TemporaryDirectory(prefix="boss-index-", dir=git_dir) as directory:
+        pending = Path(directory) / _BOSS_INDEX
+        pending.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+        pending.replace(git_dir / _BOSS_INDEX)
+
+
+def onimusha_boss_nodes(repo: Path, nodes: list[dict], index: dict) -> set[str]:
+    """Annotate raw graph nodes and return blob IDs that still need decoding."""
+    blobs = {}
+    with Repo(str(repo)) as history:
+        for node in nodes:
+            try:
+                commit = history[node["id"].encode("ascii")]
+                blobs[node["id"]] = _blob_id(history, commit).decode("ascii")
+            except (KeyError, OSError, ValueError):
+                continue
+    needed = set()
+    for node in nodes:
+        if not node["parents"]:
+            continue
+        child = blobs.get(node["id"])
+        parent = blobs.get(node["parents"][0])
+        if not child or not parent or child == parent:
+            continue
+        needed.update((child, parent))
+        current = index.get(child)
+        previous = index.get(parent)
+        names = _new_onimusha_bosses(current, previous)
+        if not names:
+            continue
+        defeated = []
+        if previous["goal"] != current["goal"]:
+            defeated = [name for name in names if previous["goal"] == f"击败{name}"]
+        node["boss_milestone"] = {"names": names, "defeated": defeated}
+    return needed - index.keys()
+
+
+def scan_onimusha_boss_index(repo: Path, tools_dir: Path, missing: set[str], should_stop) -> dict:
+    executable = _onimusha_summary_tool(tools_dir)
+    tool_version = executable.stat().st_mtime_ns
+    index = {}
+    for blob in missing:
+        if should_stop():
+            break
+        try:
+            # Release the lock between snapshots so a selected-node summary can load.
+            with _DECODE_LOCK:
+                slots = _decode_slots(repo, blob.encode("ascii"), executable, tool_version)
+        except (KeyError, OSError, ValueError):
+            continue
+        slot = next((slot for slot in slots if slot["label"] == "自动存档"), None)
+        index[blob] = (
+            {key: slot[key] for key in ("index", "goal", "boss_progress")}
+            if slot is not None and slot["boss_progress"] is not None else None
+        )
+    return index
 
 
 _MORTAL_SHELL_SLOTS = {

@@ -29,6 +29,18 @@ def _graph(nodes, tip="c3"):
 
 
 class GraphFilterTest(unittest.TestCase):
+    def test_keeps_boss_milestones_when_hiding_auto_nodes(self):
+        nodes = [
+            _node("c0", auto=True),
+            _node("c1", ["c0"], auto=True),
+            {**_node("c2", ["c1"], auto=True), "boss_milestone": {"names": ["弁庆"], "defeated": "弁庆"}},
+            _node("c3", ["c2"], auto=True),
+        ]
+        hidden = filter_auto_nodes(_graph(nodes), hide_auto=True)
+        self.assertEqual([(n["id"], n["parents"]) for n in hidden["nodes"]], [
+            ("c0", []), ("c2", ["c0"]), ("c3", ["c2"]),
+        ])
+
     def test_hides_plain_auto_keeps_start_and_tip(self):
         # c3(tip, auto) <- c2(auto) <- c1(manual) <- c0(auto 起始)
         nodes = [

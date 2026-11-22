@@ -19,11 +19,14 @@ import pystray
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
-from save_summary import summarize_mortal_shell, summarize_onimusha
+from save_summary import (
+    load_onimusha_boss_index, onimusha_boss_nodes, save_onimusha_boss_index,
+    scan_onimusha_boss_index, summarize_mortal_shell, summarize_onimusha,
+)
 from scheduler import Scheduler
 from steam import scan_installed_games
 from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
-from store import add_tag, branch_exists, delete_line, delete_node as drop_node, graph, put_note, rename_line
+from store import add_tag, branch_exists, delete_line, delete_node as drop_node, filter_auto_nodes, graph, put_note, rename_line
 from updater import check_release, stage_release, start_installer
 
 DEFAULT_ROOT = default_backup_root()
@@ -74,6 +77,8 @@ class Api:
         self._release = None
         self._update_work = None
         self._update_status = {"phase": "idle", "received": 0}
+        self._boss_indexing: set[Path] = set()
+        self._boss_index_failed: dict[Path, set[str]] = {}
 
     def check_update(self) -> dict | None:
         if (self._quit_app is None or not getattr(sys, "frozen", False)
@@ -274,13 +279,48 @@ class Api:
         repo = repo_dir(ROOT, it.id)
         if not (repo / ".git").exists():
             return {"ok": False, "error": "这份存档还没备份过"}
-        g = graph(repo, hide_auto=bool(hide_auto), current_line=it.current_line)
+        kind = _summary_kind(it)
+        is_onimusha = kind == "onimusha"
+        g = graph(repo, hide_auto=bool(hide_auto) and not is_onimusha, current_line=it.current_line)
+        if is_onimusha:
+            g["boss_indexing"] = self._index_boss_nodes(repo, g["nodes"])
+            g = filter_auto_nodes(g, bool(hide_auto))
         g["ok"] = True
         g["item_name"] = it.name
-        kind = _summary_kind(it)
         g["summary_supported"] = kind is not None
-        g["boss_progress_supported"] = kind == "onimusha"
+        g["boss_progress_supported"] = is_onimusha
         return g
+
+    def _index_boss_nodes(self, repo: Path, nodes: list[dict]) -> bool:
+        missing = onimusha_boss_nodes(repo, nodes, load_onimusha_boss_index(repo))
+        if repo in self._boss_indexing:
+            return True
+        missing -= self._boss_index_failed.get(repo, set())
+        tools_dir = ROOT / "tools"
+        if not missing or not (tools_dir / "UniversalSaveEditor.exe").is_file() or self._exiting.is_set():
+            return False
+        self._boss_indexing.add(repo)
+        threading.Thread(target=self._scan_boss_nodes, args=(repo, tools_dir, missing), daemon=True).start()
+        return True
+
+    def _scan_boss_nodes(self, repo: Path, tools_dir: Path, missing: set[str]) -> None:
+        decoded = {}
+        try:
+            decoded = scan_onimusha_boss_index(repo, tools_dir, missing, self._exiting.is_set)
+        except (OSError, ValueError):
+            pass
+        finally:
+            with self._scheduler.data_lock:
+                if decoded and ROOT == tools_dir.parent and (repo / ".git").is_dir():
+                    try:
+                        index = load_onimusha_boss_index(repo)
+                        index.update(decoded)
+                        save_onimusha_boss_index(repo, index)
+                    except OSError:
+                        decoded = {}
+                self._boss_index_failed.setdefault(repo, set()).update(missing - decoded.keys())
+                self._boss_indexing.discard(repo)
+                self._scheduler.generation += 1
 
     @_data_operation
     def node_summary(self, item_id: str, commit_id: str) -> dict:

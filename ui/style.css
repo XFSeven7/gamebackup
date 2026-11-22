@@ -5,6 +5,7 @@
   --text: #e6e6e6;
   --muted: #9a9a9a;
   --accent: #3d8bfd;
+  --boss-mark: #8ab9ff;
   --warn: #c45454;
   --current: #e6b325;
 }
@@ -154,6 +155,11 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 #btnBossProgress {
   position: absolute; left: 12px; bottom: 12px; z-index: 6;
 }
+#bossIndexStatus {
+  position: absolute; left: 12px; bottom: 48px; z-index: 6;
+  margin: 0; padding: 4px 8px; background: var(--panel); color: var(--muted);
+  border-radius: 6px; font-size: 12px;
+}
 #bossProgressStatus { margin: 0 0 14px; color: var(--muted); }
 #bossProgressList { list-style: none; margin: 0; padding: 0; }
 .boss-timeline-event {
@@ -180,6 +186,8 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 #btnAddBig { font-size: 16px; padding: 10px 18px; }
 .node { cursor: pointer; }
 .node.auto { opacity: 0.45; }
+.node.boss-milestone { opacity: 1; }
+.node .boss-mark { fill: var(--boss-mark); }
 .node.on-line { opacity: 1; }
 .node.selected circle { stroke: #fff; stroke-width: 2.5; }
 #graph.hide-remarks .remark { opacity: 0; pointer-events: none; }
