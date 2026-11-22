@@ -14,6 +14,7 @@
       return D.graphs[key] || { ok: false, error: "没有找到这份存档" };
     },
     graph_rev: async () => ({ rev: 0 }),
+    node_summary: async (id) => D.summaries?.[id] || { ok: false, error: "没有可读取的存档详情" },
     pause_all: async (paused) => ({ ok: true, paused: !!paused }),
     pause_item: async () => ({ ok: true }),
     pick_folder: async () => "",
