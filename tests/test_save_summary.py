@@ -86,7 +86,7 @@ class SaveSummaryTest(unittest.TestCase):
                 }
                 return subprocess.CompletedProcess(args, 0, stdout=json.dumps(values))
 
-            with patch("save_summary.subprocess.run", side_effect=parse_copy):
+            with patch("bundled_support.onimusha.summary.subprocess.run", side_effect=parse_copy):
                 selected_summary = summarize_onimusha(repo, selected, tools)
                 previous_summary = summarize_onimusha(repo, previous, tools)
                 result = selected_summary["slots"][0]
@@ -96,6 +96,10 @@ class SaveSummaryTest(unittest.TestCase):
                 self.assertEqual(len(missing), 2)
                 index = scan_onimusha_boss_index(repo, tools, missing, lambda: False)
                 save_onimusha_boss_index(repo, index)
+                self.assertEqual(load_onimusha_boss_index(repo, cache_version="1.0.0"), index)
+                self.assertEqual(load_onimusha_boss_index(repo, cache_version="1.1.0"), {})
+                save_onimusha_boss_index(repo, index, cache_version="1.1.0")
+                self.assertEqual(load_onimusha_boss_index(repo, cache_version="1.1.0"), index)
                 self.assertEqual(onimusha_boss_nodes(repo, nodes, load_onimusha_boss_index(repo)), set())
                 indexed = {node["id"]: node.get("boss_milestone") for node in nodes}
                 self.assertEqual(indexed, {

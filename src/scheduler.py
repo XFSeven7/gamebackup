@@ -7,12 +7,14 @@ from pathlib import Path
 
 from backup import backup_once
 from config import DEFAULT_INTERVAL_SEC, load
+from game_support import GameSupportRegistry
 
 
 class Scheduler:
-    def __init__(self, root: Path, on_tick=None):
+    def __init__(self, root: Path, on_tick=None, *, support: GameSupportRegistry | None = None):
         self.root = Path(root)
         self.on_tick = on_tick
+        self.support = support if support is not None else GameSupportRegistry()
         self._timer: threading.Timer | None = None
         self._pause_all = False
         self._stopped = False
@@ -52,7 +54,7 @@ class Scheduler:
                     cfg = load(self.root)
                     bumped = False
                     for item in cfg.items:
-                        r = backup_once(self.root, item, events_only=True)
+                        r = backup_once(self.root, item, support=self.support.for_item(item))
                         if not r.get("skipped"):
                             bumped = True
                     if bumped:

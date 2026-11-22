@@ -11,6 +11,7 @@ let summaryKey = "";
 let summaryLoadId = 0;
 let summarySlots = [];
 let summarySlotIndex = null;
+let summaryLayout = {};
 let hideAuto = localStorage.getItem("gb-auto-notes") === "0";
 let showRemarks = localStorage.getItem("gb-remarks") !== "0";
 let curveEdges = localStorage.getItem("gb-curve") !== "0";
@@ -28,6 +29,16 @@ let panLast = { x: 0, y: 0 };
 const $ = (id) => document.getElementById(id);
 
 let swallowEnterUntil = 0;
+let updatePromptPending = false;
+let changingBackupLocation = false;
+
+function presentUpdatePrompt() {
+  if (!updatePromptPending || changingBackupLocation || $("settingsPanel").open ||
+      !$("dlg").hidden || !$("busy").hidden) return;
+  updatePromptPending = false;
+  $("menu").hidden = true;
+  $("updatePanel").showModal();
+}
 
 function ask(opts) {
   return new Promise((resolve) => {
@@ -60,6 +71,7 @@ function ask(opts) {
       const ae = document.activeElement;
       if (ae && ae.blur) ae.blur();
       resolve(val);
+      setTimeout(presentUpdatePrompt, 0);
     };
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -102,6 +114,7 @@ function askOk(msg) {
 function setBusy(on, text) {
   if (text) $("busyText").textContent = text;
   $("busy").hidden = !on;
+  if (!on) setTimeout(presentUpdatePrompt, 0);
 }
 
 function onReady(fn) {
@@ -126,14 +139,20 @@ async function showAvailableUpdate() {
   const progress = $("updateProgress");
   const bytes = $("updateBytes");
   $("updateVersion").textContent = `发现新版本 ${release.version}`;
-  $("updateNotesBody").textContent = release.notes.trim() || "此版本没有填写更新说明。";
+  $("updateNotesBody").textContent = release.notes?.trim() || "此版本没有填写更新说明。";
   progress.max = release.size;
-  panel.hidden = false;
-  later.onclick = () => { panel.hidden = true; };
+  later.onclick = () => panel.close();
 
   let ready = false;
+  let updating = false;
+  panel.oncancel = (event) => {
+    if (updating) event.preventDefault();
+  };
   update.onclick = async () => {
+    updating = true;
     update.hidden = later.hidden = true;
+    status.hidden = false;
+    status.focus();
     try {
       if (!ready) {
         download.hidden = false;
@@ -171,11 +190,15 @@ async function showAvailableUpdate() {
         throw new Error(result.error);
       }
     } catch (error) {
+      updating = false;
       status.textContent = error.message || "更新失败，请重试。";
       update.textContent = "重试";
       update.hidden = later.hidden = false;
+      update.focus();
     }
   };
+  updatePromptPending = true;
+  presentUpdatePrompt();
 }
 
 function formatBytes(n) {
@@ -229,7 +252,7 @@ async function refreshItems() {
   else if (items.length === 0) {
     selectedId = null;
     hideSaveSummary();
-    setBossTabsAvailable(false);
+    setSaveTabsAvailable();
     $("bossIndexStatus").hidden = true;
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
@@ -240,7 +263,7 @@ async function refreshItems() {
 async function selectItem(id) {
   if (selectedId !== id) {
     hideSaveSummary();
-    setBossTabsAvailable(false);
+    setSaveTabsAvailable();
     summarySlotIndex = null;
     graphData = null;
     $("bossIndexStatus").hidden = true;
@@ -261,7 +284,7 @@ async function loadGraph() {
   if (request !== graphLoadId || itemId !== selectedId) return;
   if (!g.ok) {
     hideSaveSummary();
-    setBossTabsAvailable(false);
+    setSaveTabsAvailable();
     $("bossIndexStatus").hidden = true;
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
@@ -277,8 +300,8 @@ async function loadGraph() {
   $("empty").hidden = true;
   $("graphWrap").hidden = false;
   $("btnFit").hidden = false;
+  setSaveTabsAvailable(g);
   renderGraph(g);
-  setBossTabsAvailable(Boolean(g.boss_progress_supported && g.current_id));
   if (lastFitItem !== selectedId || expandedProgressNodes) {
     lastFitItem = selectedId;
     fitView();
@@ -287,8 +310,13 @@ async function loadGraph() {
 
 const saveTabs = Array.from($("saveSummaryTabs").querySelectorAll('[role="tab"]'));
 
+function supportText(group, key, fallback) {
+  const text = group?.[key];
+  return typeof text === "string" && text.trim() ? text : fallback;
+}
+
 function activateSaveTab(tabId) {
-  if ($("saveSummaryTabs").hidden) tabId = "tabSaveOverview";
+  if ($("saveSummaryTabs").hidden || $(tabId).hidden) tabId = "tabSaveOverview";
   if ($(tabId).getAttribute("aria-selected") !== "true") $("saveSummary").scrollTop = 0;
   for (const tab of saveTabs) {
     const active = tab.id === tabId;
@@ -298,11 +326,20 @@ function activateSaveTab(tabId) {
   }
 }
 
-function setBossTabsAvailable(available) {
-  $("saveSummaryTabs").hidden = !available;
-  $("btnBossProgress").hidden = !available;
-  $("saveSummaryHeading").textContent = available ? "存档详情" : "存档摘要";
-  if (!available) activateSaveTab("tabSaveOverview");
+function setSaveTabsAvailable(graph = {}, layout = graph.support_layout) {
+  const tabs = layout?.tabs;
+  const legacy = Boolean(graph.current_id && graph.boss_progress_supported);
+  const boss = Boolean(graph.current_id && (legacy || supportText(tabs, "boss", "")));
+  const achievements = Boolean(graph.current_id &&
+    ((graph.achievement_progress_supported ?? legacy) || supportText(tabs, "achievements", "")));
+  $("saveSummaryTabs").hidden = !boss && !achievements;
+  $("btnBossProgress").hidden = $("tabBossProgress").hidden = !boss;
+  $("tabAchievements").hidden = !achievements;
+  $("tabSaveOverview").textContent = supportText(tabs, "overview", "节点摘要");
+  $("btnBossProgress").textContent = $("tabBossProgress").textContent = supportText(tabs, "boss", "Boss 进度");
+  $("tabAchievements").textContent = supportText(tabs, "achievements", "成就");
+  $("saveSummaryHeading").textContent = supportText(layout?.labels, "heading", boss || achievements ? "存档详情" : "存档摘要");
+  activateSaveTab(saveTabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.id || "tabSaveOverview");
 }
 
 function renderBossProgress(bosses, unlockedCount) {
@@ -420,27 +457,33 @@ function renderSaveSlot(slot) {
   const unlocked = bosses.filter((boss) => boss.unlocked).map((boss) => boss.name);
   const locked = bosses.filter((boss) => !boss.unlocked).map((boss) => boss.name);
   renderBossProgress(bosses, unlocked.length);
-  $("saveSummaryBody").innerHTML = `
-    ${slot.facts ? "" : `<p class="save-summary-meta">当前目标</p>
-    <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`}
+  const label = (key, fallback) => escapeHtml(supportText(summaryLayout?.labels, key, fallback));
+  const sections = {
+    goal: slot.facts ? "" : `<p class="save-summary-meta">${label("goal", "当前目标")}</p>
+    <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`,
+    facts: `${supportText(summaryLayout?.labels, "facts", "") ? `<p class="save-summary-meta">${label("facts", "")}</p>` : ""}
     <dl class="save-summary-facts">${facts.map(([label, value]) =>
       `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatSummaryValue(value))}</dd>`
-    ).join("")}</dl>
-    ${bosses.length ? `<details class="save-summary-section">
-      <summary>Boss 再战进度（${unlocked.length}/${bosses.length}）</summary>
+    ).join("")}</dl>`,
+    boss: bosses.length ? `<details class="save-summary-section">
+      <summary>${label("boss", "Boss 再战进度")}（${unlocked.length}/${bosses.length}）</summary>
       <p>已解锁：${escapeHtml(unlocked.join("、") || "无")}</p>
       <p>尚未解锁：${escapeHtml(locked.join("、") || "无")}</p>
-    </details>` : ""}
-    <details class="save-summary-section" open>
-      <summary>与上一备份的变化</summary>
+    </details>` : "",
+    changes: `<details class="save-summary-section" open>
+      <summary>${label("changes", "与上一备份的变化")}</summary>
       <div class="save-summary-delta">${changeContent}</div>
-    </details>
-    <details class="save-summary-section">
-      <summary>背包（${carried.length} 种）</summary>
+    </details>`,
+    inventory: `<details class="save-summary-section">
+      <summary>${label("inventory", "背包")}（${carried.length} 种）</summary>
       ${carried.length ? `<ul>${carried.map((item) =>
         `<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">×${item.quantity.toLocaleString()}</span></li>`
       ).join("")}</ul>` : "<p>这个存档槽没有携带物品。</p>"}
-    </details>`;
+    </details>`,
+  };
+  const configured = Array.isArray(summaryLayout?.sections) ? summaryLayout.sections : [];
+  const order = new Set([...configured.filter((key) => Object.hasOwn(sections, key)), ...Object.keys(sections)]);
+  $("saveSummaryBody").innerHTML = Array.from(order, (key) => sections[key]).join("");
 }
 
 async function loadSaveSummary(g) {
@@ -450,7 +493,7 @@ async function loadSaveSummary(g) {
     hideSaveSummary();
     return;
   }
-  const key = itemId + ":" + node.id;
+  const key = JSON.stringify([itemId, node.id, g.support_version || ""]);
   if (summaryKey === key) return;
   summaryKey = key;
   const request = ++summaryLoadId;
@@ -469,6 +512,8 @@ async function loadSaveSummary(g) {
     showSaveSummaryMessage(result?.error || "暂时无法读取这版存档。", true);
     return;
   }
+  summaryLayout = result.support_layout || g.support_layout || {};
+  setSaveTabsAvailable(g, summaryLayout);
   summarySlots = result.slots || [];
   if (!summarySlots.length) {
     showSaveSummaryMessage("这版备份没有可读取的存档槽。");
@@ -489,8 +534,9 @@ async function loadSaveSummary(g) {
 const PROGRESS_LABEL_LENGTH = 24;
 const PROGRESS_LABEL_WIDTH = 350;
 
-function hasWideMilestone(node) {
-  return node.event_phase === "after" || Boolean(node.progress_milestones?.length);
+function hasWideMilestone(node, branchLabels) {
+  return node.event_phase === "after" || Boolean(node.progress_milestones?.length) ||
+    (node.event_phase === "before" && supportText(branchLabels, "before", "").length > 10);
 }
 
 function layout(g) {
@@ -586,7 +632,7 @@ function layout(g) {
   nodes.forEach((n) => {
     const col = colOf[n.id];
     if (col >= rightmostCol.get(rowOf[n.id])) return;
-    const gap = hasWideMilestone(n) ? PROGRESS_LABEL_WIDTH : FORK_GAP;
+    const gap = hasWideMilestone(n, g.support_layout?.branch_labels) ? PROGRESS_LABEL_WIDTH : FORK_GAP;
     gapAfter[col] = Math.max(gapAfter[col], gap);
   });
   const colX = [0];
@@ -596,7 +642,7 @@ function layout(g) {
 
 function layoutKey(g) {
   const nodes = (g.nodes || [])
-    .map((n) => `${n.id}:${(n.parents || []).join(",")}:${hasWideMilestone(n)}`)
+    .map((n) => `${n.id}:${(n.parents || []).join(",")}:${hasWideMilestone(n, g.support_layout?.branch_labels)}`)
     .sort()
     .join("|");
   return nodes;
@@ -699,7 +745,8 @@ function bindCanvas() {
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Space") return;
     const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary, #btnBossProgress"))) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable ||
+      t.closest?.("#saveSummary, #btnBossProgress, .app-dialog"))) return;
     e.preventDefault();
     spaceDown = true;
     pane.classList.add("pan");
@@ -803,16 +850,17 @@ function renderGraph(g) {
   const lastX = cols ? (colX && colX[cols - 1] != null ? colX[cols - 1] : (cols - 1) * COL_W) : 0;
   const rowExtra = Array(rows).fill(0);
   const nodeLabels = new Map();
+  const branchLabels = g.support_layout?.branch_labels;
   nodes.forEach((n) => {
     const reasons = new Set(n.event_phase === "after" && n.event_label ? n.event_label.split("；") : []);
-    const event = formatEventMilestone(n);
+    const event = formatEventMilestone(n, branchLabels);
     const boss = n.boss_milestone ? formatBossMilestone(n.boss_milestone, reasons) : "";
     const progress = (n.progress_milestones || []).map(({text}) => text)
       .filter((text) => !reasons.has(text.replace(/^战斗成就：/, "成就解锁：")));
     const milestones = [event, boss, ...progress].filter(Boolean);
     const showRemark = !milestones.length || Boolean(n.note || n.tags?.length);
     const extra = (milestones.length + Number(showRemark) - 1) * LINE_H;
-    nodeLabels.set(n.id, { milestones, showRemark, extra, wide: hasWideMilestone(n) });
+    nodeLabels.set(n.id, { milestones, showRemark, extra, wide: hasWideMilestone(n, branchLabels) });
     const row = rowOf[n.id];
     rowExtra[row] = Math.max(rowExtra[row], extra);
   });
@@ -919,10 +967,11 @@ function renderGraph(g) {
   });
 }
 
-function formatEventMilestone({event_phase, event_label}) {
-  if (event_phase === "before") return "事件前存档";
+function formatEventMilestone({event_phase, event_label}, labels) {
+  if (event_phase === "before") return supportText(labels, "before", "事件前存档");
   if (event_phase !== "after") return "";
-  return event_label ? `事件后 · ${event_label}` : "事件后存档";
+  const label = supportText(labels, "after", event_label ? "事件后" : "事件后存档");
+  return event_label ? `${label} · ${event_label}` : label;
 }
 
 function formatBossMilestone({names, defeated}, reasons) {
@@ -996,16 +1045,56 @@ async function addFolder(game) {
   }
 }
 
+async function refreshGameSupport() {
+  const status = $("gameSupportStatus");
+  const list = $("gameSupportList");
+  try {
+    const packs = await api().game_support?.();
+    if (!Array.isArray(packs)) throw new Error();
+    list.innerHTML = packs.map(({name, version, notes, source}) => `
+      <li class="game-support-item">
+        <div class="game-support-title">
+          <strong>${escapeHtml(name)}</strong>
+          <span class="settings-muted">v${escapeHtml(version)} · ${source === "downloaded" ? "已更新" : "内置"}</span>
+        </div>
+        ${notes ? `<p>${escapeHtml(notes)}</p>` : ""}
+      </li>
+    `).join("");
+    status.hidden = packs.length > 0;
+    status.textContent = packs.length ? "" : "当前没有可用的游戏支持包。";
+  } catch {
+    status.hidden = false;
+    status.textContent = "暂时无法读取游戏支持列表。";
+  }
+}
+
 async function openSettings() {
+  const panel = $("settingsPanel");
+  if (panel.open) return;
+  const path = $("settingsLocation");
+  const move = $("settingsMove");
+  const supportStatus = $("gameSupportStatus");
+  path.textContent = "正在读取备份位置…";
+  move.disabled = true;
+  $("gameSupportList").replaceChildren();
+  supportStatus.hidden = false;
+  supportStatus.textContent = "正在读取游戏支持列表…";
+  panel.showModal();
+  refreshGameSupport();
   try {
     const location = await api().backup_location();
-    const change = await ask({
-      kind: "confirm",
-      message: `当前备份位置\n${location.path}\n\n更改位置时，已有备份和历史会一起迁移。`,
-      okLabel: "更改位置",
-      cancelLabel: "关闭",
-    });
-    if (!change) return;
+    path.textContent = location.path;
+    move.onclick = () => changeBackupLocation(location);
+    move.disabled = false;
+  } catch {
+    path.textContent = "暂时无法读取备份位置。";
+  }
+}
+
+async function changeBackupLocation(location) {
+  changingBackupLocation = true;
+  $("settingsPanel").close();
+  try {
     const destination = await api().pick_folder(location.path);
     if (!destination || destination === location.path) return;
     const confirmed = await ask({
@@ -1028,6 +1117,9 @@ async function openSettings() {
     await askOk(result.warning || `备份已迁移到\n${result.path}`);
   } catch {
     await askOk("无法完成备份位置操作，请在设置中查看当前路径。");
+  } finally {
+    changingBackupLocation = false;
+    presentUpdatePrompt();
   }
 }
 
@@ -1175,18 +1267,21 @@ $("btnAdd").onclick = () => addFolder();
 $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
 $("btnSettings").onclick = openSettings;
+$("settingsClose").onclick = () => $("settingsPanel").close();
+$("settingsPanel").addEventListener("close", presentUpdatePrompt);
 for (const tab of saveTabs) tab.onclick = () => activateSaveTab(tab.id);
 $("achievementFilters").addEventListener("change", applyAchievementFilter);
 $("saveSummaryTabs").addEventListener("keydown", (e) => {
-  const index = saveTabs.indexOf(e.target);
+  const visible = saveTabs.filter((tab) => !tab.hidden);
+  const index = visible.indexOf(e.target);
   if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
   e.preventDefault();
   let next = 0;
-  if (e.key === "End") next = saveTabs.length - 1;
-  if (e.key === "ArrowRight") next = (index + 1) % saveTabs.length;
-  if (e.key === "ArrowLeft") next = (index + saveTabs.length - 1) % saveTabs.length;
-  activateSaveTab(saveTabs[next].id);
-  saveTabs[next].focus();
+  if (e.key === "End") next = visible.length - 1;
+  if (e.key === "ArrowRight") next = (index + 1) % visible.length;
+  if (e.key === "ArrowLeft") next = (index + visible.length - 1) % visible.length;
+  activateSaveTab(visible[next].id);
+  visible[next].focus();
 });
 $("btnBossProgress").onclick = (e) => {
   e.stopPropagation();
@@ -1270,10 +1365,13 @@ syncSide();
 
 let graphRev = 0;
 async function pullGraphIfChanged() {
-  if (!$("busy").hidden || !selectedId) return;
+  const settingsOpen = $("settingsPanel").open;
+  if (!$("busy").hidden || (!selectedId && !settingsOpen)) return;
   const r = await api().graph_rev();
   if (r.rev === graphRev) return;
   graphRev = r.rev;
+  if (settingsOpen) refreshGameSupport();
+  if (!selectedId) return;
   await refreshItems();
   await loadGraph();
 }

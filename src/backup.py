@@ -9,7 +9,7 @@ from pathlib import Path
 from config import ManagedFolder, find_item, load, new_id, save
 from event_backup import poll_event_backup
 from fingerprint import fingerprint
-from save_events import summary_kind
+from game_support import GameSupport
 from store import commit_auto, commit_manual, create_line, fork_node, graph, init_repo, reset_to, worktree_has_changes
 from sync import mirror
 
@@ -100,7 +100,7 @@ def remove_item(root: Path, item_id: str) -> None:
     save(root, cfg)
 
 
-def backup_once(root: Path, item: ManagedFolder, *, events_only: bool = False) -> dict:
+def backup_once(root: Path, item: ManagedFolder, *, support: GameSupport | None = None) -> dict:
     live = Path(item.path)
     if item.paused:
         return {"skipped": True, "reason": "paused"}
@@ -112,9 +112,8 @@ def backup_once(root: Path, item: ManagedFolder, *, events_only: bool = False) -
         return {"skipped": True, "reason": str(e)}
     repo = repo_dir(root, item.id)
     try:
-        kind = summary_kind(item) if events_only else None
-        if kind and (kind != "onimusha" or (root / "tools" / "UniversalSaveEditor.exe").is_file()):
-            result = poll_event_backup(root, repo, live, kind, fp, item.last_fingerprint)
+        if support is not None and support.available(root / "tools"):
+            result = poll_event_backup(root, repo, live, support, fp, item.last_fingerprint)
             if result is not None:
                 if not result["skipped"]:
                     item.last_fingerprint = fp

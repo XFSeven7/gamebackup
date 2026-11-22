@@ -1,0 +1,20 @@
+{
+  "id": "mortal_shell",
+  "name": "致命躯壳 2",
+  "version": "1.0.0",
+  "api_min": 1,
+  "api_max": 1,
+  "notes": "支持正式版和试玩版存档摘要、背包中文名称及大事件备份。",
+  "match": {
+    "path_suffix": [
+      "mortalshell2",
+      "saved",
+      "savegames"
+    ]
+  },
+  "layout": {
+    "sections": ["facts", "changes", "inventory"],
+    "labels": {"changes": "与上一备份的变化", "inventory": "背包"},
+    "branch_labels": {"before": "事件前存档", "after": "事件后"}
+  }
+}

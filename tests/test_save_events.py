@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import sys
 import unittest
@@ -8,6 +9,32 @@ from save_events import major_events
 
 
 class SaveEventsTest(unittest.TestCase):
+    def test_bundled_parsers_can_load_as_independent_packages(self):
+        root = Path(__file__).resolve().parents[1] / "src" / "bundled_support"
+        for game in ("onimusha", "mortal_shell"):
+            with self.subTest(game=game):
+                package = root / game
+                manifest = json.loads((package / "support.json").read_text(encoding="utf-8"))
+                self.assertEqual(manifest["id"], game)
+                self.assertEqual((manifest["api_min"], manifest["api_max"]), (1, 1))
+                name = f"_test_standalone_support_{game}"
+                spec = importlib.util.spec_from_file_location(
+                    name, package / "__init__.py", submodule_search_locations=[str(package)]
+                )
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[name] = module
+                try:
+                    spec.loader.exec_module(module)
+                    for method in ("summarize", "read_event_state", "major_events"):
+                        self.assertTrue(callable(getattr(module, method)))
+                    if game == "onimusha":
+                        for method in ("load_index", "annotate_nodes", "scan_index", "save_index"):
+                            self.assertTrue(callable(getattr(module, method)))
+                finally:
+                    for loaded in list(sys.modules):
+                        if loaded == name or loaded.startswith(name + "."):
+                            del sys.modules[loaded]
+
     def test_onimusha_tracks_matching_slots_and_known_achievement_unlocks(self):
         before = {
             "slots": {"20": {

@@ -24,13 +24,14 @@ class SchedulerTest(unittest.TestCase):
             save.write_text("0:start")
             item = add_folder(root, live, "Mortal Shell 2")
             repo = repo_dir(root, item.id)
+            support_module = Scheduler(root).support.for_item(item).module
 
-            def read_state(_kind, directory, _tools):
+            def read_state(directory, _tools):
                 return {"stage": (directory / save.name).read_text().split(":")[0]}
 
             with (
-                patch("event_backup.read_event_state", side_effect=read_state),
-                patch("event_backup.major_events", side_effect=lambda _kind, old, new: ["Boss"] if old != new else []),
+                patch.object(support_module, "read_event_state", side_effect=read_state),
+                patch.object(support_module, "major_events", side_effect=lambda old, new: ["Boss"] if old != new else []),
             ):
                 for content in ("0:first", "0:middle", "0:before"):
                     save.write_text(content)

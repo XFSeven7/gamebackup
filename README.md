@@ -13,7 +13,9 @@
 
 历史版本见 [Releases](https://github.com/XFSeven7/gamebackup/releases)。
 
-从 v1.1.2 起，Windows 版启动后会在后台检查最新正式版本。发现更新时，可查看「本次更新」，点击「立即更新」后会显示下载进度。下载校验完成后，应用会自动安装并重启，存档和设置保留。
+Windows 版启动后会在后台检查最新正式版本。发现应用更新时会弹窗提示，确认后显示下载进度。下载校验完成后，应用会自动安装并重启，存档和设置保留。
+
+游戏支持包单独在后台检查和更新。「设置 → 当前支持的游戏」显示每款游戏正在使用的支持包版本和更新说明。应用只启用与当前接口兼容的支持包，校验或加载失败时继续使用可用版本。
 
 ![主界面：多游戏 + 存档树](docs/images/main.png)
 
@@ -79,6 +81,18 @@ powershell -File scripts/build.ps1
 ```
 
 产物：`dist/gamebackup-win64.zip`。
+
+## 发布游戏支持包
+
+内置包源码位于 `src/bundled_support`。改动某款游戏的解析、摘要布局或分支说明时，提高该游戏 `support.json` 的 `version`，并填写 `notes`。应用当前的支持包接口为 API 1。只有接口确实改变时才调整包里的 `api_min` 和 `api_max`。
+
+```powershell
+python scripts/build-support-pack.py onimusha
+```
+
+脚本生成带版本的 ZIP 和 `manifest.json`，使用当前用户的专用签名密钥，也可用 `--key` 指定密钥路径。发布时，将 ZIP 上传到 `XFSeven7/gamebackup-support` 对应版本标签的 Release，再将合并后的清单更新到该仓库的 `main`。用 `--previous-manifest` 传入上一份清单，可以保留其他游戏和仍受旧应用支持的版本。签名私钥应单独保管，应用只内置公钥。
+
+支持包用相对导入维护独立包结构。必需入口为 `summarize`、`read_event_state` 和 `major_events`。可选的分支索引入口接受包版本作为缓存命名空间。布局用 `tabs`、`sections`、`labels` 和 `branch_labels` 配置现有组件。
 
 ## 重新生成 README 截图
 

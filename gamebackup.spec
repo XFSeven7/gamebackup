@@ -12,8 +12,12 @@ for pkg in ("webview", "pythonnet", "clr_loader"):
     binaries += b
     hidden += h
 hidden += collect_submodules("dulwich")
+hidden += collect_submodules("bundled_support")
 hidden += ["pystray._win32", "pystray._util.win32"]
 datas += [(str(root / "ui"), "ui")]
+support_root = root / "src" / "bundled_support"
+datas += [(str(path), str(path.parent.relative_to(support_root.parent)))
+          for path in support_root.rglob("*") if path.suffix in (".py", ".json")]
 datas += [(str(root / "scripts" / "install-update.ps1"), "scripts")]
 
 a = Analysis(

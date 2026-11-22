@@ -15,17 +15,18 @@ from dulwich.objects import Blob, Commit
 from dulwich.repo import Repo
 
 from fingerprint import fingerprint
-from save_events import major_events, read_event_state
+from game_support import GameSupport
 from store import AUTHOR
 from sync import mirror
 
 
-def _pending_sample(repo: Path, head: bytes, live: Path, kind: str) -> dict:
+def _pending_sample(repo: Path, head: bytes, live: Path, support: GameSupport) -> dict:
     try:
         metadata = json.loads((repo / ".git" / "event-sample.json").read_text(encoding="utf-8"))
         if (
             metadata["head"] == head.decode("ascii") and metadata["source"] == str(live)
-            and metadata["kind"] == kind and type(metadata["time"]) is int
+            and metadata["kind"] == support.id and metadata.get("support_version", "1.0.0") == support.version
+            and type(metadata["time"]) is int
             and isinstance(metadata["fingerprint"], str) and isinstance(metadata["state"], dict)
             and (repo / ".git" / "event-sample").is_dir()
         ):
@@ -89,7 +90,7 @@ def _publish_pair(history: Repo, repo: Path, head: bytes, sample: Path, before: 
 
 
 def poll_event_backup(
-    root: Path, repo: Path, live: Path, kind: str, current_fingerprint: str, saved_fingerprint: str,
+    root: Path, repo: Path, live: Path, support: GameSupport, current_fingerprint: str, saved_fingerprint: str,
 ) -> dict | None:
     """Yield a visible backup only when consecutive samples show a major event."""
     with Repo(str(repo)) as history:
@@ -97,7 +98,7 @@ def poll_event_backup(
             head = history.head()
         except KeyError:
             return None
-        before = _pending_sample(repo, head, live, kind)
+        before = _pending_sample(repo, head, live, support)
         if current_fingerprint == before.get("fingerprint"):
             return {"skipped": True, "reason": "unchanged"}
         with tempfile.TemporaryDirectory(prefix="event-poll-", dir=repo / ".git") as scratch:
@@ -106,22 +107,22 @@ def poll_event_backup(
             if fingerprint(sample) != current_fingerprint:
                 return {"skipped": True, "reason": "save-changing"}
             timestamp = int(time.time())
-            state = read_event_state(kind, sample, root / "tools")
+            state = support.module.read_event_state(sample, root / "tools")
             if state is None:
                 return {"skipped": True, "reason": "unreadable"}
-            binding = {"source": str(live), "kind": kind}
+            binding = {"source": str(live), "kind": support.id, "support_version": support.version}
             if not before and saved_fingerprint and saved_fingerprint != current_fingerprint:
                 saved = Path(scratch) / "saved"
                 mirror(repo, saved)
                 if fingerprint(saved) == saved_fingerprint:
-                    saved_state = read_event_state(kind, saved, root / "tools")
+                    saved_state = support.module.read_event_state(saved, root / "tools")
                     if saved_state is not None:
                         before = {
                             **binding, "head": head.decode("ascii"), "time": history[head].commit_time,
                             "fingerprint": saved_fingerprint, "state": saved_state,
                         }
                         _remember_sample(repo, saved, before)
-            labels = major_events(kind, before["state"], state) if before else []
+            labels = support.module.major_events(before["state"], state) if before else []
             if labels:
                 head = _publish_pair(history, repo, head, sample, before, timestamp, labels)
             try:

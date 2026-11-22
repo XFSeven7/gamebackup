@@ -1,0 +1,19 @@
+{
+  "id": "onimusha",
+  "name": "鬼武者：剑之道",
+  "version": "1.0.0",
+  "api_min": 1,
+  "api_max": 1,
+  "notes": "支持存档摘要、Boss 和成就进度、分支说明及大事件备份。需要 Universal Save Editor。",
+  "match": {
+    "steam_app_ids": [
+      "2638890"
+    ]
+  },
+  "layout": {
+    "tabs": {"overview": "节点摘要", "boss": "Boss 进度", "achievements": "成就"},
+    "sections": ["goal", "facts", "boss", "changes", "inventory"],
+    "labels": {"goal": "当前目标", "boss": "Boss 再战进度", "changes": "与上一备份的变化", "inventory": "背包"},
+    "branch_labels": {"before": "事件前存档", "after": "事件后"}
+  }
+}

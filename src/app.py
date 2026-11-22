@@ -18,12 +18,8 @@ import pystray
 
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
+from game_support import GameSupport, GameSupportRegistry
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
-from save_events import summary_kind as _summary_kind
-from save_summary import (
-    load_onimusha_boss_index, onimusha_boss_nodes, save_onimusha_boss_index,
-    scan_onimusha_boss_index, summarize_mortal_shell, summarize_onimusha,
-)
 from scheduler import Scheduler
 from steam import scan_installed_games
 from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
@@ -67,8 +63,8 @@ class Api:
         self._release = None
         self._update_work = None
         self._update_status = {"phase": "idle", "received": 0}
-        self._boss_indexing: set[Path] = set()
-        self._boss_index_failed: dict[Path, set[str]] = {}
+        self._boss_indexing: set[tuple[Path, str, str]] = set()
+        self._boss_index_failed: dict[tuple[Path, str, str], set[str]] = {}
 
     def check_update(self) -> dict | None:
         if (self._quit_app is None or not getattr(sys, "frozen", False)
@@ -156,6 +152,9 @@ class Api:
     def backup_location(self) -> dict:
         return {"path": str(ROOT)}
 
+    def game_support(self) -> list[dict]:
+        return self._scheduler.support.describe()
+
     @_data_operation
     def move_backup_location(self, path: str) -> dict:
         global ROOT
@@ -178,7 +177,7 @@ class Api:
         for it in cfg.items:
             row = asdict(it)
             row["available"] = Path(it.path).is_dir()
-            row["summary_supported"] = _summary_kind(it) is not None
+            row["summary_supported"] = self._scheduler.support.for_item(it) is not None
             row["path_short"] = _short_path(it.path)
             nbytes = dir_nbytes(repo_dir(ROOT, it.id))
             row["size_bytes"] = nbytes
@@ -269,47 +268,53 @@ class Api:
         repo = repo_dir(ROOT, it.id)
         if not (repo / ".git").exists():
             return {"ok": False, "error": "这份存档还没备份过"}
-        kind = _summary_kind(it)
-        is_onimusha = kind == "onimusha"
-        g = graph(repo, hide_auto=bool(hide_auto) and not is_onimusha, current_line=it.current_line)
-        if is_onimusha:
-            g["boss_indexing"] = self._index_boss_nodes(repo, g["nodes"])
+        support = self._scheduler.support.for_item(it)
+        indexed = support is not None and support.has_index
+        g = graph(repo, hide_auto=bool(hide_auto) and not indexed, current_line=it.current_line)
+        if indexed:
+            g["boss_indexing"] = self._index_boss_nodes(repo, g["nodes"], support)
             g = filter_auto_nodes(g, bool(hide_auto))
         g["ok"] = True
         g["item_name"] = it.name
-        g["summary_supported"] = kind is not None
-        g["boss_progress_supported"] = is_onimusha
+        g["summary_supported"] = support is not None
+        g["boss_progress_supported"] = indexed
+        if support is not None:
+            g["support_version"] = support.version
+            g["support_layout"] = support.layout
         return g
 
-    def _index_boss_nodes(self, repo: Path, nodes: list[dict]) -> bool:
-        missing = onimusha_boss_nodes(repo, nodes, load_onimusha_boss_index(repo))
-        if repo in self._boss_indexing:
+    def _index_boss_nodes(self, repo: Path, nodes: list[dict], support: GameSupport) -> bool:
+        key = (repo, support.id, support.version)
+        index = support.module.load_index(repo, cache_version=support.version)
+        missing = support.module.annotate_nodes(repo, nodes, index)
+        if key in self._boss_indexing:
             return True
-        missing -= self._boss_index_failed.get(repo, set())
+        missing -= self._boss_index_failed.get(key, set())
         tools_dir = ROOT / "tools"
-        if not missing or not (tools_dir / "UniversalSaveEditor.exe").is_file() or self._exiting.is_set():
+        if not missing or not support.available(tools_dir) or self._exiting.is_set():
             return False
-        self._boss_indexing.add(repo)
-        threading.Thread(target=self._scan_boss_nodes, args=(repo, tools_dir, missing), daemon=True).start()
+        self._boss_indexing.add(key)
+        threading.Thread(target=self._scan_boss_nodes, args=(key, tools_dir, missing, support), daemon=True).start()
         return True
 
-    def _scan_boss_nodes(self, repo: Path, tools_dir: Path, missing: set[str]) -> None:
+    def _scan_boss_nodes(self, key, tools_dir: Path, missing: set[str], support: GameSupport) -> None:
+        repo, _, version = key
         decoded = {}
         try:
-            decoded = scan_onimusha_boss_index(repo, tools_dir, missing, self._exiting.is_set)
+            decoded = support.module.scan_index(repo, tools_dir, missing, self._exiting.is_set)
         except (OSError, ValueError):
             pass
         finally:
             with self._scheduler.data_lock:
                 if decoded and ROOT == tools_dir.parent and (repo / ".git").is_dir():
                     try:
-                        index = load_onimusha_boss_index(repo)
+                        index = support.module.load_index(repo, cache_version=version)
                         index.update(decoded)
-                        save_onimusha_boss_index(repo, index)
+                        support.module.save_index(repo, index, cache_version=version)
                     except OSError:
                         decoded = {}
-                self._boss_index_failed.setdefault(repo, set()).update(missing - decoded.keys())
-                self._boss_indexing.discard(repo)
+                self._boss_index_failed.setdefault(key, set()).update(missing - decoded.keys())
+                self._boss_indexing.discard(key)
                 self._scheduler.generation += 1
 
     @_data_operation
@@ -317,18 +322,15 @@ class Api:
         it = find_item(load(ROOT), item_id)
         if not it:
             return {"ok": False, "error": "没有找到这份存档"}
-        kind = _summary_kind(it)
-        if kind is None:
+        support = self._scheduler.support.for_item(it)
+        if support is None:
             return {"ok": False, "error": "这个游戏暂不支持存档摘要"}
         repo = repo_dir(ROOT, it.id)
         try:
-            if kind == "mortal_shell":
-                summary = summarize_mortal_shell(repo, commit_id)
-            else:
-                summary = summarize_onimusha(repo, commit_id, ROOT / "tools")
+            summary = support.module.summarize(repo, commit_id, ROOT / "tools")
         except ValueError as e:
             return {"ok": False, "error": str(e)}
-        return {"ok": True, **summary}
+        return {"ok": True, **summary, "support_layout": support.layout}
 
     @_data_operation
     def restore(self, item_id: str, commit_id: str, fork: bool) -> dict:
@@ -474,11 +476,25 @@ def main() -> None:
         _run_app()
 
 
+def _refresh_game_support(scheduler: Scheduler, exiting: threading.Event) -> None:
+    while not exiting.is_set():
+        try:
+            updates = scheduler.support.stage_updates()
+            with scheduler.data_lock:
+                if not exiting.is_set() and scheduler.support.activate(updates):
+                    scheduler.generation += 1
+        except OSError:
+            pass
+        exiting.wait(6 * 60 * 60)
+
+
 def _run_app() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
-    scheduler = Scheduler(ROOT)
-    scheduler.start()
+    support_dir = DEFAULT_ROOT.with_name(DEFAULT_ROOT.name + "-support")
+    scheduler = Scheduler(ROOT, support=GameSupportRegistry(support_dir))
     exiting = threading.Event()
+    scheduler.start()
+    threading.Thread(target=_refresh_game_support, args=(scheduler, exiting), daemon=True).start()
 
     def quit_app(_icon=None, _item=None):
         if not exiting.is_set():
