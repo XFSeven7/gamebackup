@@ -62,30 +62,29 @@
       <div id="graphWrap" hidden>
         <svg id="graph"></svg>
       </div>
-      <button type="button" id="btnBossHistory" aria-controls="bossHistory" hidden>Boss 进度</button>
+      <button type="button" id="btnBossProgress" aria-controls="bossProgress" hidden>Boss 进度</button>
       <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
     </section>
     <details id="saveSummary" open hidden>
       <summary id="saveSummaryHeading">存档摘要</summary>
       <div id="saveSummaryTabs" role="tablist" aria-label="存档详情" hidden>
         <button type="button" id="tabSaveOverview" role="tab" aria-selected="true" aria-controls="saveSummaryOverview">节点摘要</button>
-        <button type="button" id="tabBossHistory" role="tab" aria-selected="false" aria-controls="bossHistory" tabindex="-1">Boss 进度</button>
+        <button type="button" id="tabBossProgress" role="tab" aria-selected="false" aria-controls="bossProgress" tabindex="-1">Boss 进度</button>
       </div>
+      <label id="saveSummarySlotLabel" hidden>
+        存档槽
+        <select id="saveSummarySlot"></select>
+      </label>
       <div id="saveSummaryOverview" class="save-summary-content" role="tabpanel" aria-labelledby="tabSaveOverview">
         <p id="saveSummaryNode" class="save-summary-meta"></p>
         <p id="saveSummaryStatus" class="save-summary-meta" role="status"></p>
         <button type="button" id="saveSummaryRetry" hidden>重试</button>
-        <label id="saveSummarySlotLabel" hidden>
-          存档槽
-          <select id="saveSummarySlot"></select>
-        </label>
         <div id="saveSummaryBody"></div>
       </div>
-      <div id="bossHistory" class="save-summary-content" role="tabpanel" aria-labelledby="tabBossHistory" tabindex="0" hidden>
-        <label id="bossHistoryLineLabel">分支 <select id="bossHistoryLine"></select></label>
-        <p id="bossHistoryStatus" role="status"></p>
-        <button type="button" id="bossHistoryRetry" hidden>重新读取</button>
-        <ol id="bossHistoryEvents" aria-label="Boss 再战解锁时间线"></ol>
+      <div id="bossProgress" class="save-summary-content" role="tabpanel" aria-labelledby="tabBossProgress" tabindex="0" hidden>
+        <p id="bossProgressStatus" role="status"></p>
+        <button type="button" id="bossProgressRetry" hidden>重新读取</button>
+        <ol id="bossProgressList" aria-label="Boss 剧情出场顺序"></ol>
       </div>
     </details>
   </main>

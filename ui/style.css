@@ -117,7 +117,7 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 .save-summary-content { padding: 0 14px 14px; overflow-wrap: anywhere; }
 .save-summary-meta { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 #saveSummarySlotLabel:not([hidden]) {
-  display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+  display: flex; gap: 8px; align-items: center; margin: 0 14px 12px;
 }
 #saveSummarySlot {
   min-width: 0; flex: 1; padding: 4px; border: 1px solid var(--line);
@@ -151,32 +151,22 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 #graphWrap { position: absolute; inset: 0; overflow: hidden; }
 #graph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
 #graph text { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
-#btnBossHistory {
+#btnBossProgress {
   position: absolute; left: 12px; bottom: 12px; z-index: 6;
 }
-#bossHistoryLineLabel:not([hidden]) {
-  display: flex; align-items: center; gap: 8px; color: var(--muted);
-}
-#bossHistoryLine {
-  flex: 1; min-width: 0; padding: 4px; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--bg); color: var(--text);
-}
-#bossHistoryStatus { color: var(--muted); }
-#bossHistoryStatus:empty { display: none; }
-#bossHistoryEvents { list-style: none; margin: 0; padding: 0; }
-#bossHistoryLineLabel:not([hidden]) ~ #bossHistoryEvents { margin-top: 12px; }
+#bossProgressStatus { margin: 0 0 14px; color: var(--muted); }
+#bossProgressList { list-style: none; margin: 0; padding: 0; }
 .boss-timeline-event {
-  position: relative; margin-left: 4px; padding: 0 0 14px 14px; border-left: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  position: relative; margin-left: 4px; padding: 0 0 12px 14px; border-left: 1px solid var(--line);
 }
 .boss-timeline-event:last-child { padding-bottom: 0; border-left-color: transparent; }
 .boss-timeline-event::before {
   content: ""; position: absolute; top: 5px; left: -4px; width: 7px; height: 7px;
-  background: var(--accent); border-radius: 50%;
+  background: var(--muted); border-radius: 50%;
 }
-.boss-timeline-event[data-baseline]::before { background: var(--muted); }
-.boss-timeline-date, .boss-timeline-time { display: block; color: var(--muted); font-size: 12px; }
-.boss-timeline-date { margin-bottom: 2px; }
-.boss-timeline-time { margin-top: 2px; }
+.boss-timeline-event[data-unlocked]::before { background: var(--accent); }
+.boss-timeline-state { white-space: nowrap; color: var(--muted); font-size: 12px; }
 #btnFit {
   position: absolute; right: 12px; bottom: 12px; z-index: 6;
   background: #2d2d2d; color: var(--text);

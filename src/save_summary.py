@@ -23,33 +23,34 @@ _SAVE_NAME = "data001Slot.bin"
 _PLAY_TIME = re.compile(r"^(/[^/]+/[^/]+/([0-9]+))/_Data/_ResourceData/PlayTime$")
 _ITEM_ID = re.compile(r"^(/[^/]+/[^/]+/[0-9]+)/_Data/_Items/[0-9]+/ItemID$")
 _ONIMUSHA_SAVE_TIME = "%m/%d/%Y %H:%M:%S"
-# Fixed IDs from app.RematchBoss.ID_Fixed, in game menu order.
+# Fixed IDs from app.RematchBoss.ID_Fixed, ordered by the story route.
 # https://github.com/seifhassine/REasy/blob/master/resources/data/enums/oniwots_enums.json
+# https://onimushawots.wiki/guides
 _ONIMUSHA_BOSS_NAMES = {
+    354: "佐佐木巌流",
+    12224: "大唾拉",
+    28045: "罗掌愿",
     30569: "百秽",
+    26446: "畏风",
+    5865: "鵺（青＆赤）",
+    30616: "大鵺",
     5370: "百秽（强化）",
     26515: "怒伐天",
     28128: "怒伐天（强化）",
-    5865: "鵺（青＆赤）",
-    354: "佐佐木巌流",
-    21015: "佐佐木巌流（变异）",
-    12224: "大唾拉",
-    28045: "罗掌愿",
-    30616: "大鵺",
     30875: "弁庆",
-    6164: "弁庆（完全武装）",
-    26446: "畏风",
     17004: "抚雷",
-    16869: "畏风＆抚雷",
     6309: "酒吞童子",
+    16869: "畏风＆抚雷",
+    21015: "佐佐木巌流（变异）",
     21579: "道狂",
+    6164: "弁庆（完全武装）",
     17066: "源义经",
 }
 # Avoid running multiple memory-intensive parsers when the user clicks through nodes quickly.
 _DECODE_LOCK = Lock()
 
 
-def _onimusha_boss_progress(values: dict, slot_path: str) -> dict | None:
+def _onimusha_boss_progress(values: dict, slot_path: str) -> list[dict] | None:
     root = slot_path + "/_Data/_BossRematch"
     # This flag array follows the save's BossID array, whose order differs from the menu.
     flag_path = root + "/#d54d09c5"
@@ -63,12 +64,12 @@ def _onimusha_boss_progress(values: dict, slot_path: str) -> dict | None:
     if any(type(word) is not int for word in words):
         return None
     available = {boss for index, boss in enumerate(ids) if words[index // 32] & (1 << (index % 32))}
-    menu = [boss for boss in _ONIMUSHA_BOSS_NAMES if boss in ids]
-    menu.extend(boss for boss in ids if boss not in _ONIMUSHA_BOSS_NAMES)
-    return {
-        key: [_ONIMUSHA_BOSS_NAMES.get(boss, f"Boss #{boss}") for boss in menu if (boss in available) == unlocked]
-        for key, unlocked in (("unlocked", True), ("locked", False))
-    }
+    story_order = [boss for boss in _ONIMUSHA_BOSS_NAMES if boss in ids]
+    story_order.extend(boss for boss in ids if boss not in _ONIMUSHA_BOSS_NAMES)
+    return [
+        {"name": _ONIMUSHA_BOSS_NAMES.get(boss, f"Boss #{boss}"), "unlocked": boss in available}
+        for boss in story_order
+    ]
 
 
 def _slots_from_values(values: dict) -> list[dict]:
@@ -141,8 +142,7 @@ def _snapshot_commits(repo: Repo, commit_id: str):
     return commit, parent if isinstance(parent, Commit) else None
 
 
-# Keep decoded slot summaries so reopening a branch only parses new snapshots.
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=32)
 def _decode_slots(repo_path: Path, blob_id: bytes, executable: Path, tool_version: int) -> list[dict]:
     with Repo(str(repo_path)) as repo:
         blob = repo[blob_id]
@@ -237,75 +237,19 @@ def summarize_onimusha(repo: Path, commit_id: str, tools_dir: Path) -> dict:
         ]
         items.sort(key=lambda item: (item["name"].casefold(), item["id"]))
         old_bosses = previous["boss_progress"] if previous is not None else None
-        boss_progress = slot["boss_progress"]
+        old_locked = {boss["name"] for boss in old_bosses or [] if not boss["unlocked"]}
         summaries.append({
             **{key: value for key, value in slot.items() if key != "inventory"},
             "has_previous": previous is not None,
             "previous_goal": previous["goal"] if previous is not None else None,
             "souls_delta": souls - old_souls if souls is not None and old_souls is not None else None,
             "boss_unlocked": [
-                boss for boss in boss_progress["unlocked"] if boss in old_bosses["locked"]
-            ] if boss_progress is not None and old_bosses is not None else [],
+                boss["name"] for boss in slot["boss_progress"] or []
+                if boss["unlocked"] and boss["name"] in old_locked
+            ],
             "items": items,
         })
     return {"slots": summaries}
-
-
-def onimusha_boss_history(repo: Path, tip_id: str, tools_dir: Path) -> dict:
-    """Find first observed rematch unlocks on the autosave slot of a branch."""
-    executable = _onimusha_summary_tool(tools_dir)
-    if not re.fullmatch(r"[0-9a-fA-F]{40}", tip_id):
-        raise ValueError("找不到这个分支的存档节点。")
-    repo = repo.resolve()
-    blobs = []
-    try:
-        with Repo(str(repo)) as history:
-            commit = history[tip_id.lower().encode("ascii")]
-            while isinstance(commit, Commit):
-                try:
-                    blobs.append(_blob_id(history, commit))
-                except KeyError:
-                    blobs.append(None)
-                if not commit.parents:
-                    break
-                commit = history[commit.parents[0]]
-        tool_version = executable.stat().st_mtime_ns
-    except (KeyError, OSError, NotGitRepository) as error:
-        raise ValueError("无法读取这个分支的存档历史。") from error
-
-    seen = set()
-    previous_time = None
-    events = []
-    skipped = 0
-    for blob in reversed(blobs):
-        if blob is None:
-            skipped += 1
-            continue
-        try:
-            # Release the parser lock between nodes so the selected-node summary can load.
-            with _DECODE_LOCK:
-                slots = _decode_slots(repo, blob, executable, tool_version)
-        except (KeyError, OSError, ValueError):
-            skipped += 1
-            continue
-        slot = next((slot for slot in slots if slot["label"] == "自动存档"), None)
-        if slot is None or slot["boss_progress"] is None:
-            skipped += 1
-            continue
-        try:
-            current_time = datetime.strptime(slot["saved_at"], _ONIMUSHA_SAVE_TIME).isoformat(sep=" ")
-        except ValueError:
-            current_time = None
-        new = [boss for boss in slot["boss_progress"]["unlocked"] if boss not in seen]
-        if new:
-            before = previous_time if current_time and previous_time and previous_time <= current_time else None
-            events.append({"before": before, "at": current_time, "bosses": new})
-            seen.update(new)
-        previous_time = current_time
-
-    if skipped == len(blobs):
-        raise ValueError("这个分支没有可读取 Boss 再战进度的自动存档。")
-    return {"events": events[::-1], "skipped": skipped}
 
 
 _MORTAL_SHELL_SLOTS = {

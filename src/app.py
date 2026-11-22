@@ -19,7 +19,7 @@ import pystray
 from backup import add_folder, backup_once, dir_nbytes, fork_branch, format_bytes, remove_item as drop_managed, repo_dir, restore, save_now as do_save_now
 from config import find_item, load, save
 from paths import WEBVIEW2_HELP, ui_index, webview2_installed
-from save_summary import onimusha_boss_history, summarize_mortal_shell, summarize_onimusha
+from save_summary import summarize_mortal_shell, summarize_onimusha
 from scheduler import Scheduler
 from steam import scan_installed_games
 from storage import backup_root, default_backup_root, lock_backup_instance, migrate_backup
@@ -279,20 +279,8 @@ class Api:
         g["item_name"] = it.name
         kind = _summary_kind(it)
         g["summary_supported"] = kind is not None
-        g["boss_history_supported"] = kind == "onimusha"
+        g["boss_progress_supported"] = kind == "onimusha"
         return g
-
-    def boss_history(self, item_id: str, tip_id: str) -> dict:
-        with self._scheduler.data_lock:
-            root = ROOT
-            it = find_item(load(root), item_id)
-            if not it or _summary_kind(it) != "onimusha":
-                return {"ok": False, "error": "这个游戏暂不支持 Boss 记录"}
-        try:
-            history = onimusha_boss_history(repo_dir(root, it.id), tip_id, root / "tools")
-        except ValueError as e:
-            return {"ok": False, "error": str(e)}
-        return {"ok": True, **history}
 
     @_data_operation
     def node_summary(self, item_id: str, commit_id: str) -> dict:

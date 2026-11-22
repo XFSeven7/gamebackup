@@ -11,8 +11,6 @@ let summaryKey = "";
 let summaryLoadId = 0;
 let summarySlots = [];
 let summarySlotIndex = null;
-let bossHistoryKey = "";
-let bossHistoryPending = false;
 let hideAuto = localStorage.getItem("gb-auto-notes") === "0";
 let showRemarks = localStorage.getItem("gb-remarks") !== "0";
 let curveEdges = localStorage.getItem("gb-curve") !== "0";
@@ -242,7 +240,6 @@ async function selectItem(id) {
   if (selectedId !== id) {
     hideSaveSummary();
     setBossTabsAvailable(false);
-    $("bossHistoryLine").replaceChildren();
     summarySlotIndex = null;
     graphData = null;
     $("graphWrap").hidden = true;
@@ -276,7 +273,7 @@ async function loadGraph() {
   $("graphWrap").hidden = false;
   $("btnFit").hidden = false;
   renderGraph(g);
-  syncBossHistory(g);
+  setBossTabsAvailable(Boolean(g.boss_progress_supported && g.current_id));
   if (lastFitItem !== selectedId) {
     lastFitItem = selectedId;
     fitView();
@@ -284,91 +281,32 @@ async function loadGraph() {
 }
 
 function activateSaveTab(tabId) {
-  const bossSelected = tabId === "tabBossHistory" && !$("saveSummaryTabs").hidden;
-  for (const [id, active] of [["tabSaveOverview", !bossSelected], ["tabBossHistory", bossSelected]]) {
+  const bossSelected = tabId === "tabBossProgress" && !$("saveSummaryTabs").hidden;
+  for (const [id, active] of [["tabSaveOverview", !bossSelected], ["tabBossProgress", bossSelected]]) {
     const tab = $(id);
     tab.setAttribute("aria-selected", String(active));
     tab.tabIndex = active ? 0 : -1;
     $(tab.getAttribute("aria-controls")).hidden = !active;
   }
-  if (bossSelected) loadBossHistory();
 }
 
 function setBossTabsAvailable(available) {
   $("saveSummaryTabs").hidden = !available;
-  $("btnBossHistory").hidden = !available;
+  $("btnBossProgress").hidden = !available;
   $("saveSummaryHeading").textContent = available ? "存档详情" : "存档摘要";
   if (!available) activateSaveTab("tabSaveOverview");
 }
 
-function syncBossHistory(g) {
-  const available = Boolean(g.boss_history_supported && g.lines?.length && api().boss_history);
-  setBossTabsAvailable(available);
-  if (!available) return;
-  const select = $("bossHistoryLine");
-  const line = g.lines.find((line) => line.name === select.value)?.name || g.current_line;
-  select.replaceChildren(...g.lines.map((line) => new Option(line.display || line.name, line.name)));
-  if (g.lines.some((entry) => entry.name === line)) select.value = line;
-  $("bossHistoryLineLabel").hidden = g.lines.length < 2;
-  loadBossHistory();
-}
-
-function bossHistoryTarget() {
-  const details = $("saveSummary");
-  if (details.hidden || !details.open || $("bossHistory").hidden || !selectedId) return null;
-  const line = graphData?.lines?.find((entry) => entry.name === $("bossHistoryLine").value);
-  if (!line?.tip) return null;
-  return {itemId: selectedId, tip: line.tip, key: selectedId + ":" + line.tip};
-}
-
-async function loadBossHistory() {
-  const target = bossHistoryTarget();
-  if (!target || bossHistoryKey === target.key) return;
-  bossHistoryKey = "";
-  const status = $("bossHistoryStatus");
-  const list = $("bossHistoryEvents");
-  $("bossHistoryRetry").hidden = true;
-  status.textContent = "正在读取分支历史，首次可能需要一段时间…";
-  list.replaceChildren();
-  if (bossHistoryPending) return;
-  bossHistoryPending = true;
-  let result;
-  try {
-    result = await api().boss_history(target.itemId, target.tip);
-  } catch {
-    result = {ok: false};
-  } finally {
-    bossHistoryPending = false;
-  }
-  if (bossHistoryTarget()?.key !== target.key) {
-    loadBossHistory();
-    return;
-  }
-  if (!result?.ok) {
-    status.textContent = result?.error || "暂时无法读取 Boss 记录。";
-    $("bossHistoryRetry").hidden = false;
-    return;
-  }
-  bossHistoryKey = target.key;
-  status.textContent = result.skipped ? `跳过了 ${result.skipped} 份无法读取的存档。` :
-    result.events.length ? "" : "这条分支暂无 Boss 再战解锁记录。";
-  renderBossTimeline(list, result.events);
-}
-
-function renderBossTimeline(list, events) {
-  let previousDate = "";
-  list.innerHTML = events.map(({before, at, bosses}) => {
-    const date = at?.slice(0, 10) || "";
-    const heading = date && date !== previousDate ? `<span class="boss-timeline-date">${escapeHtml(date)}</span>` : "";
-    previousDate = date;
-    const time = at?.slice(11);
-    const start = before?.startsWith(date + " ") ? before.slice(11) : before;
-    const when = before && before !== at ? `${start} 至 ${time}` : time ? `截至 ${time}` : "存档时间未知";
-    return `<li class="boss-timeline-event"${before ? "" : " data-baseline"}>
-      ${heading}<strong>${escapeHtml(bosses.join("、"))}</strong>
-      <span class="boss-timeline-time">${escapeHtml(when)}</span>
-    </li>`;
-  }).join("");
+function renderBossProgress(bosses, unlockedCount) {
+  $("bossProgressStatus").textContent = bosses.length
+    ? `剧情顺序 · 再战已解锁 ${unlockedCount}/${bosses.length}`
+    : "这份存档没有可读取的 Boss 进度。";
+  $("bossProgressRetry").hidden = true;
+  $("bossProgressList").innerHTML = bosses.map(({name, unlocked}) => `
+    <li class="boss-timeline-event"${unlocked ? " data-unlocked" : ""}>
+      <strong>${escapeHtml(name)}</strong>
+      <span class="boss-timeline-state">${unlocked ? "已解锁" : "未解锁"}</span>
+    </li>`).join("");
 }
 
 function hideSaveSummary() {
@@ -381,6 +319,9 @@ function showSaveSummaryMessage(message, retry = false) {
   $("saveSummaryStatus").textContent = message;
   $("saveSummaryStatus").hidden = false;
   $("saveSummaryRetry").hidden = !retry;
+  $("bossProgressStatus").textContent = message;
+  $("bossProgressRetry").hidden = !retry;
+  $("bossProgressList").replaceChildren();
   $("saveSummarySlotLabel").hidden = true;
   $("saveSummaryBody").replaceChildren();
 }
@@ -425,17 +366,20 @@ function renderSaveSlot(slot) {
   }
   const changeContent = !slot.has_previous ? "<p>没有可对照的同一存档槽。</p>" :
     changes.length ? `<ul>${changes.join("")}</ul>` : "<p>已显示的字段与上一版相同。</p>";
-  const boss = slot.boss_progress;
+  const bosses = slot.boss_progress || [];
+  const unlocked = bosses.filter((boss) => boss.unlocked).map((boss) => boss.name);
+  const locked = bosses.filter((boss) => !boss.unlocked).map((boss) => boss.name);
+  renderBossProgress(bosses, unlocked.length);
   $("saveSummaryBody").innerHTML = `
     ${slot.facts ? "" : `<p class="save-summary-meta">当前目标</p>
     <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`}
     <dl class="save-summary-facts">${facts.map(([label, value]) =>
       `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatSummaryValue(value))}</dd>`
     ).join("")}</dl>
-    ${boss ? `<details class="save-summary-section">
-      <summary>Boss 再战进度（${boss.unlocked.length}/${boss.unlocked.length + boss.locked.length}）</summary>
-      <p>已解锁：${escapeHtml(boss.unlocked.join("、") || "无")}</p>
-      <p>尚未解锁：${escapeHtml(boss.locked.join("、") || "无")}</p>
+    ${bosses.length ? `<details class="save-summary-section">
+      <summary>Boss 再战进度（${unlocked.length}/${bosses.length}）</summary>
+      <p>已解锁：${escapeHtml(unlocked.join("、") || "无")}</p>
+      <p>尚未解锁：${escapeHtml(locked.join("、") || "无")}</p>
     </details>` : ""}
     <details class="save-summary-section" open>
       <summary>与上一备份的变化</summary>
@@ -691,7 +635,7 @@ function bindCanvas() {
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Space") return;
     const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary, #btnBossHistory"))) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary, #btnBossProgress"))) return;
     e.preventDefault();
     spaceDown = true;
     pane.classList.add("pan");
@@ -1115,28 +1059,25 @@ $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
 $("btnSettings").onclick = openSettings;
 $("tabSaveOverview").onclick = () => activateSaveTab("tabSaveOverview");
-$("tabBossHistory").onclick = () => activateSaveTab("tabBossHistory");
+$("tabBossProgress").onclick = () => activateSaveTab("tabBossProgress");
 $("saveSummaryTabs").addEventListener("keydown", (e) => {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
   e.preventDefault();
   const boss = e.key === "End" || (e.key !== "Home" && e.target.id === "tabSaveOverview");
-  const tabId = boss ? "tabBossHistory" : "tabSaveOverview";
+  const tabId = boss ? "tabBossProgress" : "tabSaveOverview";
   activateSaveTab(tabId);
   $(tabId).focus();
 });
-$("btnBossHistory").onclick = (e) => {
+$("btnBossProgress").onclick = (e) => {
   e.stopPropagation();
   $("saveSummary").open = true;
-  activateSaveTab("tabBossHistory");
-  $("tabBossHistory").focus();
+  activateSaveTab("tabBossProgress");
+  $("tabBossProgress").focus();
 };
-$("bossHistoryRetry").onclick = loadBossHistory;
-$("bossHistoryLine").onchange = loadBossHistory;
 $("saveSummary").addEventListener("toggle", () => {
   if (graphData && !$("graphWrap").hidden) fitView();
-  loadBossHistory();
 });
-$("saveSummaryRetry").onclick = () => {
+$("saveSummaryRetry").onclick = $("bossProgressRetry").onclick = () => {
   if (!graphData) return;
   summaryKey = "";
   loadSaveSummary(graphData);

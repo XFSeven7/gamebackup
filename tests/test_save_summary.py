@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from save_summary import onimusha_boss_history, summarize_onimusha
+from save_summary import summarize_onimusha
 from store import commit_manual, init_repo
 
 
@@ -57,21 +57,21 @@ class SaveSummaryTest(unittest.TestCase):
             with patch("save_summary.subprocess.run", side_effect=parse_copy):
                 result = summarize_onimusha(repo, selected, tools)["slots"][0]
                 baseline = summarize_onimusha(repo, previous, tools)["slots"][0]
-                events = onimusha_boss_history(repo, selected, tools)["events"]
             self.assertEqual(result["goal"], "寻找父亲")
             self.assertEqual(result["location"], "清水寺")
             self.assertEqual(result["play_time"], "009:35:23")
             self.assertEqual(result["previous_goal"], "寺庙")
             self.assertEqual(result["souls_delta"], 15)
-            self.assertEqual(result["boss_progress"], {
-                "unlocked": ["怒伐天", "怒伐天（强化）", "佐佐木巌流"],
-                "locked": [],
-            })
+            self.assertEqual(result["boss_progress"], [
+                {"name": "佐佐木巌流", "unlocked": True},
+                {"name": "怒伐天", "unlocked": True},
+                {"name": "怒伐天（强化）", "unlocked": True},
+            ])
             self.assertEqual(result["boss_unlocked"], ["怒伐天", "怒伐天（强化）"])
-            self.assertEqual(events, [
-                {"before": "2026-11-21 22:00:00", "at": "2026-11-21 22:00:25",
-                 "bosses": ["怒伐天", "怒伐天（强化）"]},
-                {"before": None, "at": "2026-11-21 22:00:00", "bosses": ["佐佐木巌流"]},
+            self.assertEqual(baseline["boss_progress"], [
+                {"name": "佐佐木巌流", "unlocked": True},
+                {"name": "怒伐天", "unlocked": False},
+                {"name": "怒伐天（强化）", "unlocked": False},
             ])
             self.assertTrue(result["has_previous"])
             self.assertCountEqual(result["items"], [
