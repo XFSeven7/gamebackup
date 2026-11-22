@@ -231,7 +231,7 @@ async function refreshItems() {
   else if (items.length === 0) {
     selectedId = null;
     hideSaveSummary();
-    $("bossHistory").hidden = true;
+    setBossTabsAvailable(false);
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
@@ -241,7 +241,7 @@ async function refreshItems() {
 async function selectItem(id) {
   if (selectedId !== id) {
     hideSaveSummary();
-    $("bossHistory").hidden = true;
+    setBossTabsAvailable(false);
     $("bossHistoryLine").replaceChildren();
     summarySlotIndex = null;
     graphData = null;
@@ -262,7 +262,7 @@ async function loadGraph() {
   if (request !== graphLoadId || itemId !== selectedId) return;
   if (!g.ok) {
     hideSaveSummary();
-    $("bossHistory").hidden = true;
+    setBossTabsAvailable(false);
     $("empty").hidden = false;
     $("graphWrap").hidden = true;
     $("btnFit").hidden = true;
@@ -283,10 +283,28 @@ async function loadGraph() {
   }
 }
 
+function activateSaveTab(tabId) {
+  const bossSelected = tabId === "tabBossHistory" && !$("saveSummaryTabs").hidden;
+  for (const [id, active] of [["tabSaveOverview", !bossSelected], ["tabBossHistory", bossSelected]]) {
+    const tab = $(id);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    $(tab.getAttribute("aria-controls")).hidden = !active;
+  }
+  if (bossSelected) loadBossHistory();
+}
+
+function setBossTabsAvailable(available) {
+  $("saveSummaryTabs").hidden = !available;
+  $("btnBossHistory").hidden = !available;
+  $("saveSummaryHeading").textContent = available ? "存档详情" : "存档摘要";
+  if (!available) activateSaveTab("tabSaveOverview");
+}
+
 function syncBossHistory(g) {
-  const panel = $("bossHistory");
-  panel.hidden = !g.boss_history_supported || !g.lines?.length || !api().boss_history;
-  if (panel.hidden) return;
+  const available = Boolean(g.boss_history_supported && g.lines?.length && api().boss_history);
+  setBossTabsAvailable(available);
+  if (!available) return;
   const select = $("bossHistoryLine");
   const line = g.lines.find((line) => line.name === select.value)?.name || g.current_line;
   select.replaceChildren(...g.lines.map((line) => new Option(line.display || line.name, line.name)));
@@ -296,8 +314,8 @@ function syncBossHistory(g) {
 }
 
 function bossHistoryTarget() {
-  const panel = $("bossHistory");
-  if (panel.hidden || !panel.open || !selectedId) return null;
+  const details = $("saveSummary");
+  if (details.hidden || !details.open || $("bossHistory").hidden || !selectedId) return null;
   const line = graphData?.lines?.find((entry) => entry.name === $("bossHistoryLine").value);
   if (!line?.tip) return null;
   return {itemId: selectedId, tip: line.tip, key: selectedId + ":" + line.tip};
@@ -309,6 +327,7 @@ async function loadBossHistory() {
   bossHistoryKey = "";
   const status = $("bossHistoryStatus");
   const list = $("bossHistoryEvents");
+  $("bossHistoryRetry").hidden = true;
   status.textContent = "正在读取分支历史，首次可能需要一段时间…";
   list.replaceChildren();
   if (bossHistoryPending) return;
@@ -327,15 +346,28 @@ async function loadBossHistory() {
   }
   if (!result?.ok) {
     status.textContent = result?.error || "暂时无法读取 Boss 记录。";
+    $("bossHistoryRetry").hidden = false;
     return;
   }
   bossHistoryKey = target.key;
   status.textContent = result.skipped ? `跳过了 ${result.skipped} 份无法读取的存档。` :
     result.events.length ? "" : "这条分支暂无 Boss 再战解锁记录。";
-  list.innerHTML = result.events.map(({before, at, bosses}) => {
-    const when = before && before !== at ? `${before} 至 ${at}` :
-      at ? `截至 ${at}` : "存档时间未知";
-    return `<li><strong>${escapeHtml(bosses.join("、"))}</strong><small>${escapeHtml(when)}</small></li>`;
+  renderBossTimeline(list, result.events);
+}
+
+function renderBossTimeline(list, events) {
+  let previousDate = "";
+  list.innerHTML = events.map(({before, at, bosses}) => {
+    const date = at?.slice(0, 10) || "";
+    const heading = date && date !== previousDate ? `<span class="boss-timeline-date">${escapeHtml(date)}</span>` : "";
+    previousDate = date;
+    const time = at?.slice(11);
+    const start = before?.startsWith(date + " ") ? before.slice(11) : before;
+    const when = before && before !== at ? `${start} 至 ${time}` : time ? `截至 ${time}` : "存档时间未知";
+    return `<li class="boss-timeline-event"${before ? "" : " data-baseline"}>
+      ${heading}<strong>${escapeHtml(bosses.join("、"))}</strong>
+      <span class="boss-timeline-time">${escapeHtml(when)}</span>
+    </li>`;
   }).join("");
 }
 
@@ -659,7 +691,7 @@ function bindCanvas() {
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Space") return;
     const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary, #bossHistory"))) return;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.closest?.("#saveSummary, #btnBossHistory"))) return;
     e.preventDefault();
     spaceDown = true;
     pane.classList.add("pan");
@@ -672,7 +704,6 @@ function bindCanvas() {
   });
 
   pane.addEventListener("mousedown", (e) => {
-    if (e.target.closest("#bossHistory")) return;
     const wantPan = spaceDown || e.button === 1;
     if (!wantPan) return;
     e.preventDefault();
@@ -699,7 +730,7 @@ function bindCanvas() {
     }, 0);
   });
   pane.addEventListener("wheel", (e) => {
-    if ($("graphWrap").hidden || e.target.closest("#bossHistory")) return;
+    if ($("graphWrap").hidden) return;
     e.preventDefault();
     const rect = pane.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -724,8 +755,8 @@ function bindCanvas() {
     showSide = !showSide;
     syncSide();
   };
-  pane.addEventListener("click", (e) => {
-    if (didPan || spaceDown || !selectedNode || !graphData || e.target.closest("#bossHistory")) return;
+  pane.addEventListener("click", () => {
+    if (didPan || spaceDown || !selectedNode || !graphData) return;
     selectedNode = null;
     renderGraph(graphData);
   });
@@ -1083,10 +1114,27 @@ $("btnAdd").onclick = () => addFolder();
 $("btnAddBig").onclick = () => addFolder();
 $("btnScanSteam").onclick = scanSteamGames;
 $("btnSettings").onclick = openSettings;
-$("bossHistory").addEventListener("toggle", loadBossHistory);
+$("tabSaveOverview").onclick = () => activateSaveTab("tabSaveOverview");
+$("tabBossHistory").onclick = () => activateSaveTab("tabBossHistory");
+$("saveSummaryTabs").addEventListener("keydown", (e) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+  e.preventDefault();
+  const boss = e.key === "End" || (e.key !== "Home" && e.target.id === "tabSaveOverview");
+  const tabId = boss ? "tabBossHistory" : "tabSaveOverview";
+  activateSaveTab(tabId);
+  $(tabId).focus();
+});
+$("btnBossHistory").onclick = (e) => {
+  e.stopPropagation();
+  $("saveSummary").open = true;
+  activateSaveTab("tabBossHistory");
+  $("tabBossHistory").focus();
+};
+$("bossHistoryRetry").onclick = loadBossHistory;
 $("bossHistoryLine").onchange = loadBossHistory;
 $("saveSummary").addEventListener("toggle", () => {
   if (graphData && !$("graphWrap").hidden) fitView();
+  loadBossHistory();
 });
 $("saveSummaryRetry").onclick = () => {
   if (!graphData) return;
