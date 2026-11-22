@@ -1,0 +1,24 @@
+{
+  "id": "elden_ring",
+  "name": "艾尔登法环",
+  "version": "1.0.0",
+  "api_min": 1,
+  "api_max": 1,
+  "notes": "支持 Steam 版角色、周目、属性、卢恩、死亡次数、本体和黄金树幽影的精选 Boss，以及 Steam 账号成就和解锁时间。",
+  "match": {"steam_app_ids": ["1245620"]},
+  "layout": {
+    "tabs": {"boss": "Boss 进度", "achievements": "Steam 成就"},
+    "sections": ["facts", "changes"],
+    "labels": {
+      "heading": "角色详情",
+      "changes": "与上一备份的变化",
+      "boss": "本周目 Boss 进度",
+      "bossOrder": "本周目精选 Boss",
+      "bossCompleted": "已击败",
+      "bossPending": "未击败",
+      "bossChange": "新击败 Boss",
+      "achievementScope": "Steam 账号",
+      "achievementUnavailable": "没有找到该存档所属 Steam 账号的本地成就记录。"
+    }
+  }
+}

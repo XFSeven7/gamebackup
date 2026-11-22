@@ -104,6 +104,10 @@ class GameSupport:
         check = getattr(self.module, "available", None)
         return bool(check(tools_dir)) if callable(check) else True
 
+    def index_available(self, tools_dir: Path) -> bool:
+        check = getattr(self.module, "index_available", None)
+        return bool(check(tools_dir)) if callable(check) else self.available(tools_dir)
+
     def info(self) -> dict:
         return {"id": self.id, "name": self.name, "version": self.version,
                 "notes": self.notes, "source": self.source}

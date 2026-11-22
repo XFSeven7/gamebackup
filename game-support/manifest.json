@@ -18,6 +18,15 @@
       "url": "https://github.com/XFSeven7/gamebackup/releases/download/support-v1.0.0/mortal_shell-v1.0.0.zip",
       "sha256": "620c0ea8543509607789efba38fef79a38f0df8f5f8c7fd2d1f2aecd8282be02",
       "signature": "nqpgK+Mw31VKkiGYQGtfkRebBY6HYNBrjDHeEoDX1Tt8FGKdytkZA/F7R0lCV6VRD0zChxrXggRT4F5u9++RCA=="
+    },
+    {
+      "id": "elden_ring",
+      "version": "1.0.0",
+      "api_min": 1,
+      "api_max": 1,
+      "url": "https://github.com/XFSeven7/gamebackup/releases/download/support-v1.0.1/elden_ring-v1.0.0.zip",
+      "sha256": "72c2246b59d710e9a57f4421b9f3ac6aa803b86e4a6094d843643b8de25d0a2f",
+      "signature": "aTSWhghEZYwRHeo4wPhQcOZ+0Cho2hel7yAHkPOKaYZ4U5/VOU/A3wgnJtLDuN87w/fw6lkjoVbLqJ/DX72UDQ=="
     }
   ]
 }

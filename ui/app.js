@@ -343,26 +343,34 @@ function setSaveTabsAvailable(graph = {}, layout = graph.support_layout) {
 }
 
 function renderBossProgress(bosses, unlockedCount) {
+  const labels = summaryLayout?.labels;
+  const order = supportText(labels, "bossOrder", "剧情顺序");
+  const complete = supportText(labels, "bossCompleted", "已解锁");
+  const pending = supportText(labels, "bossPending", "未解锁");
   $("bossProgressStatus").textContent = bosses.length
-    ? `剧情顺序 · 再战已解锁 ${unlockedCount}/${bosses.length}`
+    ? `${order} · ${supportText(labels, "bossCompleted", "再战已解锁")} ${unlockedCount}/${bosses.length}`
     : "这份存档没有可读取的 Boss 进度。";
   $("bossProgressRetry").hidden = true;
-  $("bossProgressList").innerHTML = bosses.map(({name, unlocked}) => `
+  $("bossProgressList").setAttribute("aria-label", `Boss · ${order}`);
+  $("bossProgressList").innerHTML = bosses.map(({name, unlocked, group}, index) => `
+    ${group && group !== bosses[index - 1]?.group
+        ? `<li class="boss-timeline-group">${escapeHtml(group)}</li>` : ""}
     <li class="boss-timeline-event"${unlocked ? " data-unlocked" : ""}>
       <strong>${escapeHtml(name)}</strong>
-      <span class="boss-timeline-state">${unlocked ? "已解锁" : "未解锁"}</span>
+      <span class="boss-timeline-state">${escapeHtml(unlocked ? complete : pending)}</span>
     </li>`).join("");
 }
 
 function renderAchievements(achievements) {
+  const labels = summaryLayout?.labels;
   const unlocked = achievements.filter((entry) => entry.unlocked).length;
   const readable = achievements.some((entry) => entry.unlocked !== null);
   $("achievementStatus").textContent = readable
-    ? `本地成就 · 已解锁 ${unlocked}/${achievements.length}`
-    : "这份存档没有可读取的成就进度。";
+    ? `${supportText(labels, "achievementScope", "本地成就")} · 已解锁 ${unlocked}/${achievements.length}`
+    : supportText(labels, "achievementUnavailable", "这份存档没有可读取的成就进度。");
   $("achievementRetry").hidden = true;
   $("achievementFilters").hidden = !readable;
-  $("achievementList").innerHTML = achievements.map(({name, description, target, value, unlocked}) => {
+  $("achievementList").innerHTML = achievements.map(({name, description, target, value, unlocked, unlocked_at}) => {
     const status = unlocked ? "已解锁" : value === null ? "无进度记录" :
       target === 1 ? "未解锁" : `${value}/${target}`;
     const bar = value === null
@@ -372,6 +380,7 @@ function renderAchievements(achievements) {
       <li class="achievement-row" data-completion="${unlocked === null ? "unknown" : unlocked ? "complete" : "incomplete"}">
         <div class="achievement-title"><strong>${escapeHtml(name)}</strong><span>${status}</span></div>
         <p>${escapeHtml(description)}</p>
+        ${unlocked_at && !description.includes(unlocked_at) ? `<p>解锁于 ${escapeHtml(unlocked_at)}</p>` : ""}
         ${bar}
       </li>`;
   }).join("");
@@ -422,6 +431,7 @@ function formatSummaryValue(value) {
 }
 
 function renderSaveSlot(slot) {
+  const label = (key, fallback) => escapeHtml(supportText(summaryLayout?.labels, key, fallback));
   const facts = [
     ["游玩时长", slot.play_time],
     [slot.facts ? "重生点" : "地点", slot.location],
@@ -446,7 +456,7 @@ function renderSaveSlot(slot) {
     changes.push(`<li><span>${escapeHtml(label)}</span><span>${escapeHtml(change)}</span></li>`);
   }
   if (slot.boss_unlocked?.length) {
-    changes.push(`<li><span>新增 Boss 再战</span><span>${escapeHtml(slot.boss_unlocked.join("、"))}</span></li>`);
+    changes.push(`<li><span>${label("bossChange", "新增 Boss 再战")}</span><span>${escapeHtml(slot.boss_unlocked.join("、"))}</span></li>`);
   }
   for (const item of changed) {
     changes.push(`<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">${formatSummaryDelta(item.delta)}</span></li>`);
@@ -457,7 +467,6 @@ function renderSaveSlot(slot) {
   const unlocked = bosses.filter((boss) => boss.unlocked).map((boss) => boss.name);
   const locked = bosses.filter((boss) => !boss.unlocked).map((boss) => boss.name);
   renderBossProgress(bosses, unlocked.length);
-  const label = (key, fallback) => escapeHtml(supportText(summaryLayout?.labels, key, fallback));
   const sections = {
     goal: slot.facts ? "" : `<p class="save-summary-meta">${label("goal", "当前目标")}</p>
     <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`,
@@ -467,19 +476,19 @@ function renderSaveSlot(slot) {
     ).join("")}</dl>`,
     boss: bosses.length ? `<details class="save-summary-section">
       <summary>${label("boss", "Boss 再战进度")}（${unlocked.length}/${bosses.length}）</summary>
-      <p>已解锁：${escapeHtml(unlocked.join("、") || "无")}</p>
-      <p>尚未解锁：${escapeHtml(locked.join("、") || "无")}</p>
+      <p>${label("bossCompleted", "已解锁")}：${escapeHtml(unlocked.join("、") || "无")}</p>
+      <p>${label("bossPending", "尚未解锁")}：${escapeHtml(locked.join("、") || "无")}</p>
     </details>` : "",
     changes: `<details class="save-summary-section" open>
       <summary>${label("changes", "与上一备份的变化")}</summary>
       <div class="save-summary-delta">${changeContent}</div>
     </details>`,
-    inventory: `<details class="save-summary-section">
+    inventory: slot.items ? `<details class="save-summary-section">
       <summary>${label("inventory", "背包")}（${carried.length} 种）</summary>
       ${carried.length ? `<ul>${carried.map((item) =>
         `<li><span>${escapeHtml(item.name)}</span><span class="save-summary-number">×${item.quantity.toLocaleString()}</span></li>`
       ).join("")}</ul>` : "<p>这个存档槽没有携带物品。</p>"}
-    </details>`,
+    </details>` : "",
   };
   const configured = Array.isArray(summaryLayout?.sections) ? summaryLayout.sections : [];
   const order = new Set([...configured.filter((key) => Object.hasOwn(sections, key)), ...Object.keys(sections)]);

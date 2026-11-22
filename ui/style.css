@@ -181,6 +181,7 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 }
 #bossProgressStatus { margin: 0 0 14px; color: var(--muted); }
 #bossProgressList { list-style: none; margin: 0; padding: 0; }
+.boss-timeline-group { margin: 8px 0 10px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .boss-timeline-event {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
   position: relative; margin-left: 4px; padding: 0 0 12px 14px; border-left: 1px solid var(--line);

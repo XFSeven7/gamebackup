@@ -291,7 +291,7 @@ class Api:
             return True
         missing -= self._boss_index_failed.get(key, set())
         tools_dir = ROOT / "tools"
-        if not missing or not support.available(tools_dir) or self._exiting.is_set():
+        if not missing or not support.index_available(tools_dir) or self._exiting.is_set():
             return False
         self._boss_indexing.add(key)
         threading.Thread(target=self._scan_boss_nodes, args=(key, tools_dir, missing, support), daemon=True).start()
