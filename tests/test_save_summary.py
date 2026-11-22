@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from save_summary import summarize_onimusha
+from save_summary import onimusha_boss_history, summarize_onimusha
 from store import commit_manual, init_repo
 
 
@@ -40,23 +40,39 @@ class SaveSummaryTest(unittest.TestCase):
                 values = {
                     f"{slot}/_Data/_ResourceData/PlayTime": 1,
                     f"{slot}/_Data/_ResourceData/SoulAmount": 100 if earlier else 115,
-                    f"{slot}/Detail": f"11/21/2026 22:00:00\t009:35:23\t剑戟\t{'寺庙' if earlier else '寻找父亲'}",
+                    f"{slot}/Detail": f"11/21/2026 22:00:{'00' if earlier else '25'}\t009:35:23\t剑戟\t{'寺庙' if earlier else '寻找父亲'}",
                     f"{slot}/Subtitle": "101\t清水寺",
                     f"{slot}/_Data/_Items/0/ItemID": 15508,
                     f"{slot}/_Data/_Items/0/EquipNum": 2 if earlier else 5,
                     f"{slot}/_Data/_Items/1/ItemID": 2,
                     f"{slot}/_Data/_Items/1/EquipNum": 1 if earlier else 0,
+                    f"{slot}/_Data/_BossRematch/#d54d09c5/_MaxElement": 3,
+                    f"{slot}/_Data/_BossRematch/#d54d09c5/_Value/0": 1 if earlier else 7,
+                    f"{slot}/_Data/_BossRematch/BossID/0": 354,
+                    f"{slot}/_Data/_BossRematch/BossID/1": 26515,
+                    f"{slot}/_Data/_BossRematch/BossID/2": 28128,
                 }
                 return subprocess.CompletedProcess(args, 0, stdout=json.dumps(values))
 
             with patch("save_summary.subprocess.run", side_effect=parse_copy):
                 result = summarize_onimusha(repo, selected, tools)["slots"][0]
                 baseline = summarize_onimusha(repo, previous, tools)["slots"][0]
+                events = onimusha_boss_history(repo, selected, tools)["events"]
             self.assertEqual(result["goal"], "寻找父亲")
             self.assertEqual(result["location"], "清水寺")
             self.assertEqual(result["play_time"], "009:35:23")
             self.assertEqual(result["previous_goal"], "寺庙")
             self.assertEqual(result["souls_delta"], 15)
+            self.assertEqual(result["boss_progress"], {
+                "unlocked": ["怒伐天", "怒伐天（强化）", "佐佐木巌流"],
+                "locked": [],
+            })
+            self.assertEqual(result["boss_unlocked"], ["怒伐天", "怒伐天（强化）"])
+            self.assertEqual(events, [
+                {"before": "2026-11-21 22:00:00", "at": "2026-11-21 22:00:25",
+                 "bosses": ["怒伐天", "怒伐天（强化）"]},
+                {"before": None, "at": "2026-11-21 22:00:00", "bosses": ["佐佐木巌流"]},
+            ])
             self.assertTrue(result["has_previous"])
             self.assertCountEqual(result["items"], [
                 {"id": 15508, "name": "砥石", "quantity": 5, "delta": 3},

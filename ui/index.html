@@ -62,6 +62,14 @@
       <div id="graphWrap" hidden>
         <svg id="graph"></svg>
       </div>
+      <details id="bossHistory" hidden>
+        <summary>Boss 再战解锁记录</summary>
+        <div class="boss-history-content">
+          <label id="bossHistoryLineLabel">分支 <select id="bossHistoryLine"></select></label>
+          <p id="bossHistoryStatus" role="status"></p>
+          <ul id="bossHistoryEvents"></ul>
+        </div>
+      </details>
       <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
     </section>
     <details id="saveSummary" open hidden>
