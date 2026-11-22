@@ -1,0 +1,22 @@
+{
+  "id": "sekiro",
+  "name": "只狼：影逝二度",
+  "version": "1.0.0",
+  "api_min": 1,
+  "api_max": 1,
+  "notes": "支持 Steam 版存档槽、周目、攻击力、体力、伤药葫芦、结局、Boss 进度，以及 Steam 成就和解锁时间。",
+  "match": {"steam_app_ids": ["814380"]},
+  "layout": {
+    "tabs": {"boss": "Boss 进度", "achievements": "Steam 成就"},
+    "sections": ["facts", "changes"],
+    "labels": {
+      "heading": "存档详情",
+      "boss": "本周目 Boss 进度",
+      "bossOrder": "本周目精选 Boss",
+      "bossCompleted": "已击败",
+      "bossPending": "未击败",
+      "achievementScope": "Steam 账号",
+      "achievementUnavailable": "没有找到该存档所属 Steam 账号的本地成就记录。"
+    }
+  }
+}
