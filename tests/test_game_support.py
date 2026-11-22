@@ -45,7 +45,7 @@ def major_events(*args):
     return []
 """)
             data = buffer.getvalue()
-            url = support_asset_url("onimusha", version)
+            url = support_asset_url("onimusha", version, "1.2.0")
             responses[url] = data
             rows.append({
                 **{key: metadata[key] for key in ("id", "version", "api_min", "api_max")},

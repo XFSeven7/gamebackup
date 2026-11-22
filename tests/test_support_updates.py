@@ -30,7 +30,7 @@ class SupportUpdatesTest(unittest.TestCase):
                 pack.writestr(extra, "unsafe file")
         archive = buffer.getvalue()
         descriptor.update({
-            "url": support_asset_url(pack_id, version),
+            "url": support_asset_url(pack_id, version, version),
             "sha256": hashlib.sha256(archive).hexdigest(),
             "signature": base64.b64encode(self.key.sign(archive)).decode("ascii"),
         })
@@ -64,6 +64,9 @@ class SupportUpdatesTest(unittest.TestCase):
             archived = {**current[0], "url": "https://github.com/XFSeven7/gamebackup-support/releases/download/onimusha-v2.0.0/onimusha-v2.0.0.zip"}
             receipt.write_text(json.dumps(archived), encoding="utf-8")
             self.assertEqual(verified_installed_descriptor(target, self.public_key), archived)
+            previous = {**current[0], "url": "https://github.com/XFSeven7/gamebackup/releases/download/support-onimusha-v2.0.0/onimusha-v2.0.0.zip"}
+            receipt.write_text(json.dumps(previous), encoding="utf-8")
+            self.assertEqual(verified_installed_descriptor(target, self.public_key), previous)
             receipt.write_text(json.dumps({**current[0], "api_min": 2}), encoding="utf-8")
             self.assertIsNone(verified_installed_descriptor(target, self.public_key))
             receipt.write_text(json.dumps(current[0]), encoding="utf-8")
@@ -109,6 +112,17 @@ class SupportUpdatesTest(unittest.TestCase):
             installed, urls = self.run_update(Path(temp), [(archived, archive)], {})
             self.assertEqual(installed, [])
             self.assertEqual(urls, [MANIFEST_URL])
+
+    def test_two_games_can_share_release_tag_with_different_pack_versions(self):
+        first, first_archive = self.asset("2.0.0")
+        second, second_archive = self.asset("1.1.0", pack_id="mortal_shell")
+        release = "https://github.com/XFSeven7/gamebackup/releases/download/support-v4.2.0"
+        first["url"] = f"{release}/onimusha-v2.0.0.zip"
+        second["url"] = f"{release}/mortal_shell-v1.1.0.zip"
+        with tempfile.TemporaryDirectory() as temp:
+            installed, _ = self.run_update(Path(temp), [(first, first_archive), (second, second_archive)], {})
+            self.assertEqual({path.parent.name: path.name for path in installed},
+                             {"onimusha": "2.0.0", "mortal_shell": "1.1.0"})
 
     def test_rejects_signed_archive_with_disallowed_paths_before_validation(self):
         for entry in ("../escape.py", "NUL.txt", "subdir/file:stream", "__INIT__.PY",

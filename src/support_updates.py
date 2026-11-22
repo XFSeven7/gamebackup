@@ -43,9 +43,9 @@ def parse_version(value: object) -> tuple[int, int, int] | None:
     return None
 
 
-def support_asset_url(pack_id: str, version: str) -> str:
+def support_asset_url(pack_id: str, version: str, release_version: str) -> str:
     name = f"{pack_id}-v{version}"
-    return f"https://github.com/{REPOSITORY}/releases/download/support-{name}/{name}.zip"
+    return f"https://github.com/{REPOSITORY}/releases/download/support-v{release_version}/{name}.zip"
 
 
 def _approved_asset_url(url: str, expected_url: str) -> bool:
@@ -96,8 +96,13 @@ def _descriptor(data: object, *, installed: bool = False) -> dict | None:
         return None
     # Existing receipts remain usable. New downloads only use the current feed.
     name = f"{pack_id}-v{version}"
-    previous_url = f"https://github.com/XFSeven7/gamebackup-support/releases/download/{name}/{name}.zip"
-    if url != support_asset_url(pack_id, version) and not (installed and url == previous_url):
+    release_version = url.rpartition("/")[0].rpartition("/")[2].removeprefix("support-v")
+    current_url = parse_version(release_version) is not None and url == support_asset_url(pack_id, version, release_version)
+    previous_urls = (
+        f"https://github.com/{REPOSITORY}/releases/download/support-{name}/{name}.zip",
+        f"https://github.com/XFSeven7/gamebackup-support/releases/download/{name}/{name}.zip",
+    )
+    if not current_url and not (installed and url in previous_urls):
         return None
     try:
         if len(base64.b64decode(signature, validate=True)) != 64:

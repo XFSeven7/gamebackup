@@ -87,10 +87,10 @@ powershell -File scripts/build.ps1
 内置包源码位于 `src/bundled_support`。改动某款游戏的解析、摘要布局或分支说明时，提高该游戏 `support.json` 的 `version`，并填写 `notes`。应用当前的支持包接口为 API 1。只有接口确实改变时才调整包里的 `api_min` 和 `api_max`。
 
 ```powershell
-python scripts/build-support-pack.py onimusha
+python scripts/build-support-pack.py 1.1.0
 ```
 
-脚本生成带版本的 ZIP 和 `manifest.json`，使用当前用户的专用签名密钥，也可用 `--key` 指定密钥路径。将 ZIP 上传到本仓库对应的支持包标签，例如 `support-onimusha-v1.1.0`，发布为预发行版。附件上线后，用生成的清单更新 `main` 分支的 `game-support/manifest.json`。脚本默认合并该清单，保留其他游戏和仍受旧应用支持的版本。应用本体继续使用 `v1.x.y` 正式 Release。签名私钥应单独保管，应用只内置公钥。
+脚本将这次有新版本的游戏支持包打成 ZIP，并在 `dist/game-support/support-v1.1.0` 生成合并后的清单。将这些 ZIP 上传到本仓库同一个 `support-v1.1.0` 预发行版。发布标签和各游戏的支持包版本独立编号。附件上线后，用生成的清单更新 `main` 分支的 `game-support/manifest.json`，保留其他游戏和仍受旧应用支持的版本。签名使用当前用户的专用密钥，也可用 `--key` 指定。应用本体继续使用 `v1.x.y` 正式 Release，应用只内置签名公钥。
 
 支持包用相对导入维护独立包结构。必需入口为 `summarize`、`read_event_state` 和 `major_events`。可选的分支索引入口接受包版本作为缓存命名空间。布局用 `tabs`、`sections`、`labels` 和 `branch_labels` 配置现有组件。
 
