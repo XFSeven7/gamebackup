@@ -349,24 +349,25 @@ function renderBossProgress(bosses, unlockedCount) {
   const pending = supportText(labels, "bossPending", "未解锁");
   $("bossProgressStatus").textContent = bosses.length
     ? `${order} · ${supportText(labels, "bossCompleted", "再战已解锁")} ${unlockedCount}/${bosses.length}`
-    : "这份存档没有可读取的 Boss 进度。";
+    : supportText(labels, "bossUnavailable", "这份存档没有可读取的 Boss 进度。");
   $("bossProgressRetry").hidden = true;
-  $("bossProgressList").setAttribute("aria-label", `Boss · ${order}`);
-  $("bossProgressList").innerHTML = bosses.map(({name, unlocked, group}, index) => `
+  $("bossProgressList").setAttribute("aria-label", `${$("tabBossProgress").textContent} · ${order}`);
+  $("bossProgressList").innerHTML = bosses.map(({name, display_name, unlocked, group, detail}, index) => `
     ${group && group !== bosses[index - 1]?.group
         ? `<li class="boss-timeline-group">${escapeHtml(group)}</li>` : ""}
     <li class="boss-timeline-event"${unlocked ? " data-unlocked" : ""}>
-      <strong>${escapeHtml(name)}</strong>
-      <span class="boss-timeline-state">${escapeHtml(unlocked ? complete : pending)}</span>
+      <strong>${escapeHtml(display_name || name)}</strong>
+      <span class="boss-timeline-state${detail ? " boss-timeline-detail" : ""}">${escapeHtml(detail || (unlocked ? complete : pending))}</span>
     </li>`).join("");
 }
 
 function renderAchievements(achievements) {
   const labels = summaryLayout?.labels;
   const unlocked = achievements.filter((entry) => entry.unlocked).length;
-  const readable = achievements.some((entry) => entry.unlocked !== null);
+  const unknown = achievements.filter((entry) => entry.unlocked === null).length;
+  const readable = unknown < achievements.length;
   $("achievementStatus").textContent = readable
-    ? `${supportText(labels, "achievementScope", "本地成就")} · 已解锁 ${unlocked}/${achievements.length}`
+    ? `${supportText(labels, "achievementScope", "本地成就")} · 已解锁 ${unlocked}/${achievements.length}${unknown ? ` · ${unknown} 项未读取` : ""}`
     : supportText(labels, "achievementUnavailable", "这份存档没有可读取的成就进度。");
   $("achievementRetry").hidden = true;
   $("achievementFilters").hidden = !readable;
@@ -414,6 +415,7 @@ function showSaveSummaryMessage(message, retry = false) {
   $("bossProgressRetry").hidden = !retry;
   $("bossProgressList").replaceChildren();
   $("achievementStatus").textContent = message;
+  $("achievementContext").hidden = true;
   $("achievementRetry").hidden = !retry;
   $("achievementFilters").hidden = true;
   $("achievementEmpty").hidden = true;
@@ -431,6 +433,8 @@ function formatSummaryValue(value) {
 }
 
 function renderSaveSlot(slot) {
+  $("achievementContext").textContent = slot.achievement_context || "";
+  $("achievementContext").hidden = !slot.achievement_context;
   const label = (key, fallback) => escapeHtml(supportText(summaryLayout?.labels, key, fallback));
   const facts = [
     ["游玩时长", slot.play_time],
@@ -464,8 +468,8 @@ function renderSaveSlot(slot) {
   const changeContent = !slot.has_previous ? "<p>没有可对照的同一存档槽。</p>" :
     changes.length ? `<ul>${changes.join("")}</ul>` : "<p>已显示的字段与上一版相同。</p>";
   const bosses = slot.boss_progress || [];
-  const unlocked = bosses.filter((boss) => boss.unlocked).map((boss) => boss.name);
-  const locked = bosses.filter((boss) => !boss.unlocked).map((boss) => boss.name);
+  const unlocked = bosses.filter((boss) => boss.unlocked).map((boss) => boss.display_name || boss.name);
+  const locked = bosses.filter((boss) => !boss.unlocked).map((boss) => boss.display_name || boss.name);
   renderBossProgress(bosses, unlocked.length);
   const sections = {
     goal: slot.facts ? "" : `<p class="save-summary-meta">${label("goal", "当前目标")}</p>

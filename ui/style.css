@@ -193,6 +193,7 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 }
 .boss-timeline-event[data-unlocked]::before { background: var(--accent); }
 .boss-timeline-state { white-space: nowrap; color: var(--muted); font-size: 12px; }
+.boss-timeline-detail { white-space: pre-line; text-align: right; font-variant-numeric: tabular-nums; }
 #achievementStatus { margin: 0 0 8px; color: var(--muted); }
 #achievementFilters:not([hidden]) {
   display: flex; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 6px;

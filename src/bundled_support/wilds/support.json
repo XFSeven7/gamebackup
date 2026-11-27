@@ -1,0 +1,25 @@
+{
+  "id": "wilds",
+  "name": "怪物猎人：荒野",
+  "version": "1.0.0",
+  "api_min": 1,
+  "api_max": 1,
+  "notes": "查看猎人档案、背包、怪物讨伐和捕获统计，以及 Steam 成就。",
+  "match": {
+    "steam_app_ids": ["2246340"],
+    "path_suffix": ["2246340", "remote", "win64_save"]
+  },
+  "layout": {
+    "tabs": {"boss": "怪物图鉴", "achievements": "成就"},
+    "sections": ["facts", "changes", "inventory"],
+    "labels": {
+      "boss": "怪物图鉴",
+      "bossOrder": "大型怪物",
+      "bossCompleted": "已狩猎",
+      "bossPending": "未狩猎",
+      "bossUnavailable": "这份存档没有可读取的怪物图鉴。",
+      "achievementScope": "Steam 账号",
+      "achievementUnavailable": "暂无可读取的 Steam 解锁记录。"
+    }
+  }
+}

@@ -36,6 +36,15 @@
       "url": "https://github.com/XFSeven7/gamebackup/releases/download/support-v1.0.2/sekiro-v1.0.0.zip",
       "sha256": "5270487778d9bf2419e9d79a33eaecbc7d79ae4c74e67a96345d497b5dc73ab2",
       "signature": "gLlP00qukPHi1iHU5+3d21uu1DsBJ/6DF2ALVToOGk7wN1tGy4OfPoM5LjmprODaxoXz+mXNHldk9DlpnKNgAQ=="
+    },
+    {
+      "id": "wilds",
+      "version": "1.0.0",
+      "api_min": 1,
+      "api_max": 1,
+      "url": "https://github.com/XFSeven7/gamebackup/releases/download/support-v1.0.3/wilds-v1.0.0.zip",
+      "sha256": "3a8c6b1670424dbba6131320ea1d5df15d04ccff5b3f957d9a1914ab4f73b471",
+      "signature": "2gBsk19Zi6rXJZj+HjIkwH365yYzSBu2gTatDRG4pEXeVn5xuw7RImKzHY+djxcV9kyYop3uVkA+dqf9fWyTCQ=="
     }
   ]
 }
