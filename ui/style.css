@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #1c1c1c;
   --panel: #252526;
   --line: #3c3c3c;
@@ -11,6 +12,16 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", "Microsoft YaHei", sans-serif; }
+@media (forced-colors: none) {
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    min-width: 28px; min-height: 28px; border: 2px solid transparent; border-radius: 999px;
+    background: #707077; background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: #8d9099; }
+  ::-webkit-scrollbar-thumb:active { background-color: #a3c8ff; }
+}
 header {
   height: 48px; display: flex; align-items: center; gap: 12px;
   padding: 0 16px; border-bottom: 1px solid var(--line);
@@ -25,10 +36,14 @@ button {
   border-radius: 6px; padding: 6px 12px; cursor: pointer;
 }
 button:hover { background: #3d3d3d; }
-#btnAdd, #btnAddBig, #btnSaveNow { background: var(--accent); border-color: #2d6fd0; color: #fff; }
+#btnAdd, #btnAddBig, #btnSaveNow { background: var(--accent); border-color: #2d6fd0; color: #101e34; }
 body { display: flex; flex-direction: column; }
 header { flex: none; }
-main { position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr); flex: 1; min-height: 0; }
+main {
+  --side-default: 220px;
+  position: relative; display: grid; grid-template-columns: var(--side-width, var(--side-default)) minmax(0, 1fr);
+  flex: 1; min-height: 0;
+}
 .app-dialog {
   width: min(480px, calc(100% - 32px)); max-height: calc(100% - 32px);
   padding: 20px 22px 16px; border: 1px solid #555; border-radius: 10px;
@@ -58,6 +73,18 @@ main { position: relative; display: grid; grid-template-columns: 220px minmax(0,
 #updateNotes summary { cursor: pointer; }
 #updateNotesBody { max-height: 10em; margin: 6px 0 0; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 main.side-off { grid-template-columns: 1fr; }
+#sideResize {
+  position: absolute; inset-block: 0; left: var(--side-width, var(--side-default)); transform: translateX(-50%);
+  z-index: 8; width: 9px; cursor: col-resize; touch-action: none;
+}
+#sideResize::after {
+  content: ""; position: absolute; inset-block: 0; left: 50%; width: 2px; transform: translateX(-50%);
+}
+#sideResize:hover::after, #sideResize:focus-visible::after, main.side-resizing #sideResize::after {
+  background: var(--accent);
+}
+#sideResize:focus-visible { outline: none; }
+main.side-resizing { cursor: col-resize; user-select: none; }
 aside {
   display: flex; flex-direction: column;
   border-right: 1px solid var(--line); overflow: hidden; padding: 12px; background: var(--panel);
@@ -98,6 +125,22 @@ li.item .size { color: #d0d0d0; font-size: 12px; margin-top: 2px; }
 }
 li.missing { outline: 1px solid var(--warn); }
 li.line.current { font-weight: 700; color: var(--current); }
+#workspace { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#workspaceHeader:not([hidden]) {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 16px 22px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.workspace-title { min-width: 0; }
+.workspace-title h1 { margin: 0 0 3px; font-size: 21px; line-height: 1.3; overflow-wrap: anywhere; }
+#saveSummaryNode { margin: 0; }
+.workspace-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.workspace-actions button { white-space: nowrap; }
+#btnRestoreSnapshot { border-color: #638cb9; color: #b9d7ff; }
+#workspaceBody {
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+  flex: 1; min-height: 0; min-width: 0;
+}
+#workspaceBody:has(#saveSummary:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(190px, 253px); }
 #graphPane {
   position: relative;
   overflow: hidden;
@@ -107,48 +150,64 @@ li.line.current { font-weight: 700; color: var(--current); }
 }
 #graphPane.pan { cursor: grab; }
 #graphPane.panning { cursor: grabbing; }
+.graph-tools {
+  position: absolute; top: 12px; right: 12px; z-index: 6; display: flex; gap: 8px; align-items: center;
+  flex-wrap: wrap; padding: 5px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+}
+#recentHistory {
+  min-height: 0; min-width: 0; overflow: auto; padding: 14px;
+  background: var(--panel); border-left: 1px solid var(--line);
+}
+#saveSummary[hidden] + #recentHistory { border-left: 0; background: var(--bg); padding: 16px 22px; }
+.history-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 10px; }
+.history-head h2 { margin: 0; color: var(--text); font-size: 14px; letter-spacing: normal; }
+.history-head .toggle { white-space: nowrap; font-size: 12px; }
+.history-row {
+  display: block; width: 100%; margin-bottom: 4px; padding: 8px 10px; text-align: left;
+  background: transparent; border-color: transparent; overflow-wrap: anywhere;
+}
+.history-row strong, .history-row time { display: block; }
+.history-row time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.history-row[aria-current="true"] { background: #2a3f5f; border-color: #5578a8; }
+.history-row:focus-visible, .workspace-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#btnMoreHistory { margin-top: 8px; width: 100%; }
+#historyStatus { margin-top: 10px; }
 #saveSummary {
-  overflow: auto; min-width: 0; background: var(--panel); border-left: 1px solid var(--line);
+  overflow: auto; overflow-anchor: none; min-height: 0; min-width: 0; background: var(--bg);
   font-variant-numeric: tabular-nums;
 }
-main:has(#saveSummary[open]:not([hidden])) { grid-template-columns: 220px minmax(0, 1fr) 290px; }
-main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: minmax(0, 1fr) 290px; }
-#saveSummary > summary {
-  padding: 12px 14px; font-weight: 700; cursor: pointer;
-}
-#saveSummary:not([open]) {
-  position: absolute; z-index: 7; top: 12px; right: 12px;
-  border: 1px solid var(--line); border-radius: 6px;
-}
-#saveSummary:not([open]) > summary { padding: 6px 10px; }
 #saveSummaryTabs:not([hidden]) {
-  display: flex; position: sticky; top: 0; z-index: 1; background: var(--panel);
-  margin: 0 0 14px; padding: 0 14px; border-bottom: 1px solid var(--line);
+  display: flex; position: sticky; top: 0; z-index: 1; background: var(--bg);
+  gap: 12px; margin: 0 0 16px; padding: 0 22px; border-bottom: 1px solid var(--line);
 }
 #saveSummaryTabs button {
-  flex: 1; padding: 6px 4px 8px; background: transparent; border: 0;
+  padding: 10px 4px 8px; background: transparent; border: 0;
   border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted);
 }
 #saveSummaryTabs button:hover { color: var(--text); }
 #saveSummaryTabs button[aria-selected="true"] {
   color: var(--text); border-bottom-color: var(--accent); font-weight: 600;
 }
-.save-summary-content { padding: 0 14px 14px; overflow-wrap: anywhere; }
+.save-summary-content { max-width: 820px; padding: 0 22px 18px; overflow-wrap: anywhere; }
+@media (min-width: 1550px) { .save-summary-content { max-width: 1040px; } }
+#saveSummaryTabs[hidden] ~ .save-summary-content { padding-top: 16px; }
 .save-summary-meta { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
 #saveSummarySlotLabel:not([hidden]) {
-  display: flex; gap: 8px; align-items: center; margin: 0 14px 12px;
+  display: flex; gap: 8px; align-items: center; margin: 0 22px 12px;
 }
 #saveSummary:has(#tabAchievements[aria-selected="true"]) #saveSummarySlotLabel { display: none; }
 #saveSummarySlot {
-  min-width: 0; flex: 1; padding: 4px; border: 1px solid var(--line);
+  min-width: 0; max-width: min(300px, 75%); padding: 4px; border: 1px solid var(--line);
   border-radius: 6px; background: var(--bg); color: var(--text);
 }
 .save-summary-goal { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
 .save-summary-facts {
-  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 12px 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 0 18px; margin: 8px 0 18px;
 }
-.save-summary-facts dt { color: var(--muted); }
-.save-summary-facts dd { margin: 0; }
+.save-summary-facts > div { min-width: 0; padding: 8px 0 9px; border-bottom: 1px solid var(--line); }
+.save-summary-facts dt { color: var(--muted); font-size: 12px; }
+.save-summary-facts dd { margin: 2px 0 0; font-size: 15px; font-weight: 600; }
 .save-summary-section { padding: 9px 0; border-top: 1px solid var(--line); }
 .save-summary-section summary { cursor: pointer; font-weight: 600; }
 .save-summary-section ul { margin-top: 6px; }
@@ -159,14 +218,22 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
 .save-summary-section p { margin: 6px 0 0; }
 .save-summary-delta { color: var(--muted); }
 #saveSummary :is(summary, select, button, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-@media (max-width: 850px) {
-  main:has(#saveSummary[open]:not([hidden])) { grid-template-columns: 220px minmax(0, 1fr); }
-  main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: 1fr; }
-  #saveSummary[open]:not([hidden]) {
-    position: absolute; z-index: 7; top: 12px; right: 12px;
-    width: min(290px, calc(100% - 64px)); max-height: calc(100% - 64px);
-    border: 1px solid var(--line); border-radius: 6px;
+@media (max-width: 830px) {
+  main { --side-default: 170px; }
+  #workspaceBody:has(#saveSummary:not([hidden])) { grid-template-columns: minmax(0, 1fr) 187px; }
+}
+@media (max-width: 690px) {
+  header { height: auto; min-height: 48px; gap: 5px; padding: 6px 8px; flex-wrap: wrap; }
+  header button { padding: 4px 6px; }
+  main { --side-default: 143px; }
+  #workspaceHeader:not([hidden]) { padding: 10px 12px; align-items: flex-start; flex-wrap: wrap; }
+  #workspaceBody:has(#saveSummary:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) fit-content(37%);
   }
+  #recentHistory { border-left: 0; border-top: 1px solid var(--line); }
+  #saveSummary[hidden] + #recentHistory { border-top: 0; }
+  #saveSummaryTabs:not([hidden]), .save-summary-content { padding-inline: 12px; }
+  #saveSummarySlotLabel:not([hidden]) { margin-inline: 12px; }
 }
 #graphWrap { position: absolute; inset: 0; overflow: hidden; }
 #graph { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
@@ -228,11 +295,7 @@ main.side-off:has(#saveSummary[open]:not([hidden])) { grid-template-columns: min
   position: absolute; right: 12px; bottom: 12px; z-index: 6;
   background: #2d2d2d; color: var(--text);
 }
-#btnSide {
-  position: absolute; left: 12px; top: 12px; z-index: 6;
-  background: #2d2d2d; color: var(--text); padding: 4px 10px;
-}
-#empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
+#empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 18px; text-align: center; color: var(--muted); }
 #empty[hidden], #graphWrap[hidden], #menu[hidden], #btnFit[hidden], #dlg[hidden], #dlgInput[hidden], #busy[hidden], #side[hidden], #sideTotal[hidden] { display: none !important; }
 #btnAddBig { font-size: 16px; padding: 10px 18px; }
 .node { cursor: pointer; }

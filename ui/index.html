@@ -2,18 +2,13 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>存档助手 v1.1.5</title>
+  <title>存档助手 v1.1.6</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
-    <div class="brand">存档助手 v1.1.5</div>
-    <label class="toggle"><input type="checkbox" id="showAuto" /> 显示自动存档</label>
-    <label class="toggle"><input type="checkbox" id="showRemarks" checked /> 显示备注</label>
-    <span class="seg" title="树图连线">
-      <button type="button" id="btnCurve">曲线</button>
-      <button type="button" id="btnStraight">直线</button>
-    </span>
+    <div class="brand">存档助手 v1.1.6</div>
+    <button type="button" id="btnSide" aria-controls="side" aria-expanded="true">游戏列表</button>
     <button type="button" id="btnSaveNow">立即保存</button>
     <button type="button" id="btnPauseAll">暂停自动备份</button>
     <button type="button" id="btnSettings">设置</button>
@@ -35,54 +30,84 @@
       </div>
       <div id="sideTotal" class="side-total" hidden></div>
     </aside>
-    <section id="graphPane">
-      <button type="button" id="btnSide" title="隐藏游戏列表">‹</button>
+    <div id="sideResize" role="separator" tabindex="0" aria-label="调整游戏列表宽度"
+         aria-orientation="vertical" aria-controls="side" title="拖动调整宽度，双击恢复默认"></div>
+    <div id="workspace">
       <div id="empty">
-        <p>从左侧选择 Steam 游戏，或手动添加。选好存档文件夹后即开始备份。</p>
+        <p id="workspaceStatus" role="status">从左侧选择 Steam 游戏，或手动添加。选好存档文件夹后即开始备份。</p>
         <button type="button" id="btnAddBig">选择游戏存档</button>
       </div>
-      <div id="graphWrap" hidden>
-        <svg id="graph"></svg>
-      </div>
-      <button type="button" id="btnBossProgress" aria-controls="bossProgress" hidden>Boss 进度</button>
-      <p id="bossIndexStatus" role="status" hidden>正在识别存档进展…</p>
-      <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
-    </section>
-    <details id="saveSummary" open hidden>
-      <summary id="saveSummaryHeading">存档摘要</summary>
-      <div id="saveSummaryTabs" role="tablist" aria-label="存档详情" hidden>
-        <button type="button" id="tabSaveOverview" role="tab" aria-selected="true" aria-controls="saveSummaryOverview">节点摘要</button>
-        <button type="button" id="tabBossProgress" role="tab" aria-selected="false" aria-controls="bossProgress" tabindex="-1">Boss 进度</button>
-        <button type="button" id="tabAchievements" role="tab" aria-selected="false" aria-controls="achievements" tabindex="-1">成就</button>
-      </div>
-      <label id="saveSummarySlotLabel" hidden>
-        存档槽
-        <select id="saveSummarySlot"></select>
-      </label>
-      <div id="saveSummaryOverview" class="save-summary-content" role="tabpanel" aria-labelledby="tabSaveOverview">
-        <p id="saveSummaryNode" class="save-summary-meta"></p>
-        <p id="saveSummaryStatus" class="save-summary-meta" role="status"></p>
-        <button type="button" id="saveSummaryRetry" hidden>重试</button>
-        <div id="saveSummaryBody"></div>
-      </div>
-      <div id="bossProgress" class="save-summary-content" role="tabpanel" aria-labelledby="tabBossProgress" tabindex="0" hidden>
-        <p id="bossProgressStatus" role="status"></p>
-        <button type="button" id="bossProgressRetry" hidden>重新读取</button>
-        <ol id="bossProgressList" aria-label="Boss 剧情出场顺序"></ol>
-      </div>
-      <div id="achievements" class="save-summary-content" role="tabpanel" aria-labelledby="tabAchievements" tabindex="0" hidden>
-        <p id="achievementContext" class="save-summary-meta" hidden></p>
-        <p id="achievementStatus" role="status"></p>
-        <button type="button" id="achievementRetry" hidden>重新读取</button>
-        <div id="achievementFilters" role="radiogroup" aria-label="按完成状态筛选成就" hidden>
-          <label><input type="radio" name="achievementFilter" value="all" checked><span>全部</span></label>
-          <label><input type="radio" name="achievementFilter" value="complete"><span>已完成</span></label>
-          <label><input type="radio" name="achievementFilter" value="incomplete"><span>未完成</span></label>
+      <div id="workspaceHeader" hidden>
+        <div class="workspace-title">
+          <h1 id="workspaceTitle"></h1>
+          <p id="saveSummaryNode" class="save-summary-meta"></p>
         </div>
-        <p id="achievementEmpty" class="save-summary-meta" role="status" hidden></p>
-        <ul id="achievementList" aria-label="存档成就"></ul>
+        <div class="workspace-actions">
+          <button type="button" id="btnRestoreSnapshot" hidden>恢复这份存档</button>
+          <button type="button" id="btnShowGraph" aria-controls="graphPane" aria-expanded="false">查看分支树</button>
+        </div>
       </div>
-    </details>
+      <div id="workspaceBody">
+        <section id="graphPane" aria-label="存档分支树" hidden>
+          <div class="graph-tools" aria-label="分支树显示设置">
+            <label class="toggle"><input type="checkbox" id="showAuto" /> 显示自动存档</label>
+            <label class="toggle"><input type="checkbox" id="showRemarks" checked /> 显示备注</label>
+            <span class="seg" title="树图连线">
+              <button type="button" id="btnCurve">曲线</button>
+              <button type="button" id="btnStraight">直线</button>
+            </span>
+          </div>
+          <div id="graphWrap" hidden>
+            <svg id="graph"></svg>
+          </div>
+          <button type="button" id="btnBossProgress" aria-controls="bossProgress" hidden>Boss 进度</button>
+          <p id="bossIndexStatus" role="status" hidden>正在识别存档进展…</p>
+          <button type="button" id="btnFit" hidden title="把整张图放进窗口">最佳展示</button>
+        </section>
+        <section id="saveSummary" aria-label="游戏进度" hidden>
+          <div id="saveSummaryTabs" role="tablist" aria-label="存档详情" hidden>
+            <button type="button" id="tabSaveOverview" role="tab" aria-selected="true" aria-controls="saveSummaryOverview">概览</button>
+            <button type="button" id="tabBossProgress" role="tab" aria-selected="false" aria-controls="bossProgress" tabindex="-1">Boss 进度</button>
+            <button type="button" id="tabAchievements" role="tab" aria-selected="false" aria-controls="achievements" tabindex="-1">成就</button>
+          </div>
+          <label id="saveSummarySlotLabel" hidden>
+            存档槽
+            <select id="saveSummarySlot"></select>
+          </label>
+          <div id="saveSummaryOverview" class="save-summary-content" role="tabpanel" aria-labelledby="tabSaveOverview">
+            <p id="saveSummaryStatus" class="save-summary-meta" role="status"></p>
+            <button type="button" id="saveSummaryRetry" hidden>重试</button>
+            <div id="saveSummaryBody"></div>
+          </div>
+          <div id="bossProgress" class="save-summary-content" role="tabpanel" aria-labelledby="tabBossProgress" tabindex="0" hidden>
+            <p id="bossProgressStatus" role="status"></p>
+            <button type="button" id="bossProgressRetry" hidden>重新读取</button>
+            <ol id="bossProgressList" aria-label="Boss 剧情出场顺序"></ol>
+          </div>
+          <div id="achievements" class="save-summary-content" role="tabpanel" aria-labelledby="tabAchievements" tabindex="0" hidden>
+            <p id="achievementContext" class="save-summary-meta" hidden></p>
+            <p id="achievementStatus" role="status"></p>
+            <button type="button" id="achievementRetry" hidden>重新读取</button>
+            <div id="achievementFilters" role="radiogroup" aria-label="按完成状态筛选成就" hidden>
+              <label><input type="radio" name="achievementFilter" value="all" checked><span>全部</span></label>
+              <label><input type="radio" name="achievementFilter" value="complete"><span>已完成</span></label>
+              <label><input type="radio" name="achievementFilter" value="incomplete"><span>未完成</span></label>
+            </div>
+            <p id="achievementEmpty" class="save-summary-meta" role="status" hidden></p>
+            <ul id="achievementList" aria-label="存档成就"></ul>
+          </div>
+        </section>
+        <section id="recentHistory" aria-labelledby="historyHeading" hidden>
+          <div class="history-head">
+            <h2 id="historyHeading">近期存档</h2>
+            <label class="toggle" id="historyFilter"><input type="checkbox" id="showAllHistory" /> 全部备份</label>
+          </div>
+          <ul id="historyList" aria-labelledby="historyHeading"></ul>
+          <button type="button" id="btnMoreHistory" hidden>加载更早的存档</button>
+          <p id="historyStatus" class="save-summary-meta" role="status" hidden></p>
+        </section>
+      </div>
+    </div>
   </main>
   <ul id="menu" hidden></ul>
   <dialog id="settingsPanel" class="app-dialog" aria-labelledby="settingsHeading">

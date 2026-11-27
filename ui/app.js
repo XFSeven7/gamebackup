@@ -6,6 +6,8 @@ let addingFolder = false;
 let selectedId = null;
 let graphData = null;
 let selectedNode = null;
+let showGraph = false;
+let historyLimit = 12;
 let graphLoadId = 0;
 let summaryKey = "";
 let summaryLoadId = 0;
@@ -247,28 +249,20 @@ async function refreshItems() {
     totalEl.hidden = items.length === 0;
     totalEl.textContent = items.length ? "总占用 " + formatBytes(total) : "";
   }
-  $("empty").hidden = items.length > 0 && !!selectedId;
   if (!selectedId && items[0]) selectItem(items[0].id);
   else if (items.length === 0) {
     selectedId = null;
-    hideSaveSummary();
-    setSaveTabsAvailable();
-    $("bossIndexStatus").hidden = true;
-    $("empty").hidden = false;
-    $("graphWrap").hidden = true;
-    $("btnFit").hidden = true;
+    resetWorkspace("从左侧选择 Steam 游戏，或手动添加。选好存档文件夹后即开始备份。", true);
   }
 }
 
 async function selectItem(id) {
   if (selectedId !== id) {
-    hideSaveSummary();
-    setSaveTabsAvailable();
     summarySlotIndex = null;
-    graphData = null;
-    $("bossIndexStatus").hidden = true;
-    $("graphWrap").hidden = true;
-    $("btnFit").hidden = true;
+    showGraph = false;
+    historyLimit = 12;
+    $("showAllHistory").checked = false;
+    resetWorkspace("正在读取备份历史…");
   }
   selectedId = id;
   selectedNode = null;
@@ -276,35 +270,124 @@ async function selectItem(id) {
   await loadGraph();
 }
 
+function resetWorkspace(message, canAdd = false) {
+  graphData = null;
+  hideSaveSummary();
+  setSaveTabsAvailable();
+  $("graphPane").hidden = true;
+  $("graphWrap").hidden = true;
+  $("workspaceHeader").hidden = true;
+  $("recentHistory").hidden = true;
+  $("workspaceStatus").textContent = message;
+  $("btnAddBig").hidden = !canAdd;
+  $("empty").hidden = false;
+}
+
 async function loadGraph() {
   if (!selectedId) return;
   const itemId = selectedId;
   const request = ++graphLoadId;
-  const g = await api().graph(itemId, hideAuto);
+  let g;
+  try {
+    g = await api().graph(itemId, showGraph && hideAuto);
+  } catch {
+    g = {ok: false, error: "暂时无法读取备份历史。"};
+  }
   if (request !== graphLoadId || itemId !== selectedId) return;
-  if (!g.ok) {
-    hideSaveSummary();
-    setSaveTabsAvailable();
-    $("bossIndexStatus").hidden = true;
-    $("empty").hidden = false;
-    $("graphWrap").hidden = true;
-    $("btnFit").hidden = true;
+  if (!g.ok || !g.current_id) {
+    resetWorkspace(g.error || "这个游戏还没有可浏览的备份。");
     return;
   }
   const expandedProgressNodes = hideAuto && graphData?.boss_indexing && !g.boss_indexing
     && graphData.nodes.length !== g.nodes.length;
   graphData = g;
   if (selectedNode) {
-    selectedNode = (g.nodes || []).find((n) => n.id === selectedNode.id) || null;
+    const node = g.nodes.find((n) => n.id === selectedNode.id);
+    selectedNode = node || (showGraph && hideAuto ? selectedNode : null);
   }
   $("empty").hidden = true;
-  $("graphWrap").hidden = false;
-  $("btnFit").hidden = false;
   setSaveTabsAvailable(g);
-  renderGraph(g);
-  if (lastFitItem !== selectedId || expandedProgressNodes) {
+  renderWorkspace();
+  if (showGraph && (lastFitItem !== selectedId || expandedProgressNodes)) {
     lastFitItem = selectedId;
     fitView();
+  }
+}
+
+function currentPreview(g) {
+  return selectedNode || g.nodes.find((node) => node.id === g.current_id);
+}
+
+function renderWorkspace() {
+  const g = graphData;
+  if (!g) return;
+  const node = currentPreview(g);
+  const history = node && node.id !== g.current_id;
+  $("workspaceHeader").hidden = false;
+  $("workspaceTitle").textContent = g.item_name;
+  $("saveSummaryNode").textContent = node
+    ? [history ? "历史备份" : "当前备份", formatTime(node.time)].filter(Boolean).join(" · ")
+    : "";
+  $("btnRestoreSnapshot").hidden = !history;
+  $("btnShowGraph").textContent = showGraph ? (g.summary_supported ? "返回游戏进度" : "返回存档历史") : "查看分支树";
+  $("btnShowGraph").setAttribute("aria-expanded", String(showGraph));
+  $("graphPane").hidden = $("graphWrap").hidden = $("btnFit").hidden = !showGraph;
+  $("recentHistory").hidden = showGraph;
+  if (showGraph) {
+    hideSaveSummary();
+    renderGraph(g);
+  } else {
+    renderHistory(g, node);
+    loadSaveSummary(g);
+  }
+}
+
+function historyTitle(node, g) {
+  const progress = node.progress_milestones?.find(({text}) => text)?.text;
+  return node.note || node.tags?.[0] || formatEventMilestone(node, g.support_layout?.branch_labels) ||
+    (node.boss_milestone && formatBossMilestone(node.boss_milestone, new Set())) || progress ||
+    (!node.parents?.length ? "首次备份" : node.auto ? "自动备份" : shortMsg(node.message) || "手动保存");
+}
+
+function renderHistory(g, preview) {
+  const list = $("historyList");
+  const focused = list.contains(document.activeElement) ? document.activeElement.dataset.nodeId : null;
+  const all = !g.summary_supported || $("showAllHistory").checked;
+  const nodes = g.nodes.filter((node) => all || node.id === g.current_id || node.id === preview?.id ||
+    !node.auto || !node.parents?.length || node.note || node.tags?.length ||
+    node.event_phase || node.boss_milestone || node.progress_milestones?.length);
+  nodes.sort((a, b) => Number(b.id === g.current_id) - Number(a.id === g.current_id) || b.time - a.time);
+  const rows = nodes.slice(0, historyLimit);
+  if (preview && !rows.some((node) => node.id === preview.id)) rows.push(preview);
+  $("historyHeading").textContent = g.summary_supported ? "近期存档" : "存档历史";
+  $("historyFilter").hidden = !g.summary_supported;
+  $("btnMoreHistory").hidden = nodes.length <= historyLimit;
+  $("historyStatus").hidden = Boolean(rows.length);
+  $("historyStatus").textContent = rows.length ? "" : "还没有可浏览的备份。";
+  list.replaceChildren(...rows.map((node) => {
+    const li = document.createElement("li");
+    const button = document.createElement("button");
+    const title = document.createElement("strong");
+    const time = document.createElement("time");
+    button.type = "button";
+    button.className = "history-row";
+    button.dataset.nodeId = node.id;
+    if (node.id === preview?.id) button.setAttribute("aria-current", "true");
+    title.textContent = (node.id === g.current_id ? "当前 · " : "") + historyTitle(node, g);
+    time.textContent = formatTime(node.time);
+    if (node.time) time.dateTime = new Date(node.time * 1000).toISOString();
+    button.append(title, time);
+    button.onclick = () => {
+      selectedNode = node.id === g.current_id ? null : node;
+      $("saveSummary").scrollTop = 0;
+      renderWorkspace();
+    };
+    li.append(button);
+    return li;
+  }));
+  if (focused) {
+    Array.from(list.querySelectorAll("button")).find((button) => button.dataset.nodeId === focused)
+      ?.focus({preventScroll: true});
   }
 }
 
@@ -317,13 +400,14 @@ function supportText(group, key, fallback) {
 
 function activateSaveTab(tabId) {
   if ($("saveSummaryTabs").hidden || $(tabId).hidden) tabId = "tabSaveOverview";
-  if ($(tabId).getAttribute("aria-selected") !== "true") $("saveSummary").scrollTop = 0;
+  const changed = $(tabId).getAttribute("aria-selected") !== "true";
   for (const tab of saveTabs) {
     const active = tab.id === tabId;
     tab.setAttribute("aria-selected", String(active));
     tab.tabIndex = active ? 0 : -1;
     $(tab.getAttribute("aria-controls")).hidden = !active;
   }
+  if (changed) $("saveSummary").scrollTop = 0;
 }
 
 function setSaveTabsAvailable(graph = {}, layout = graph.support_layout) {
@@ -335,10 +419,10 @@ function setSaveTabsAvailable(graph = {}, layout = graph.support_layout) {
   $("saveSummaryTabs").hidden = !boss && !achievements;
   $("btnBossProgress").hidden = $("tabBossProgress").hidden = !boss;
   $("tabAchievements").hidden = !achievements;
-  $("tabSaveOverview").textContent = supportText(tabs, "overview", "节点摘要");
+  $("tabSaveOverview").textContent = supportText(tabs, "overview", "概览");
   $("btnBossProgress").textContent = $("tabBossProgress").textContent = supportText(tabs, "boss", "Boss 进度");
   $("tabAchievements").textContent = supportText(tabs, "achievements", "成就");
-  $("saveSummaryHeading").textContent = supportText(layout?.labels, "heading", boss || achievements ? "存档详情" : "存档摘要");
+  $("saveSummary").setAttribute("aria-label", supportText(layout?.labels, "heading", "游戏进度"));
   activateSaveTab(saveTabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.id || "tabSaveOverview");
 }
 
@@ -436,10 +520,13 @@ function renderSaveSlot(slot) {
   $("achievementContext").textContent = slot.achievement_context || "";
   $("achievementContext").hidden = !slot.achievement_context;
   const label = (key, fallback) => escapeHtml(supportText(summaryLayout?.labels, key, fallback));
+  const difficulty = typeof slot.difficulty === "string"
+    ? slot.difficulty.replace(/<\/?(?:ICON|COLOR)\b[^>]*>/gi, "").trim()
+    : slot.difficulty;
   const facts = [
     ["游玩时长", slot.play_time],
     [slot.facts ? "重生点" : "地点", slot.location],
-    ["难度", slot.difficulty],
+    ["难度", difficulty],
     ["游戏保存时间", slot.saved_at],
   ].filter(([, value]) => value);
   if (Number.isFinite(slot.souls)) {
@@ -476,7 +563,7 @@ function renderSaveSlot(slot) {
     <p class="save-summary-goal">${escapeHtml(slot.goal || "暂无目标记录")}</p>`,
     facts: `${supportText(summaryLayout?.labels, "facts", "") ? `<p class="save-summary-meta">${label("facts", "")}</p>` : ""}
     <dl class="save-summary-facts">${facts.map(([label, value]) =>
-      `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatSummaryValue(value))}</dd>`
+      `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(formatSummaryValue(value))}</dd></div>`
     ).join("")}</dl>`,
     boss: bosses.length ? `<details class="save-summary-section">
       <summary>${label("boss", "Boss 再战进度")}（${unlocked.length}/${bosses.length}）</summary>
@@ -501,7 +588,7 @@ function renderSaveSlot(slot) {
 
 async function loadSaveSummary(g) {
   const itemId = selectedId;
-  const node = selectedNode || (g.nodes || []).find((n) => n.id === g.current_id);
+  const node = currentPreview(g);
   if (!g.summary_supported || !itemId || !node) {
     hideSaveSummary();
     return;
@@ -511,8 +598,6 @@ async function loadSaveSummary(g) {
   summaryKey = key;
   const request = ++summaryLoadId;
   $("saveSummary").hidden = false;
-  const type = node.id === g.current_id ? "当前节点" : "历史节点";
-  $("saveSummaryNode").textContent = [type, formatTime(node.time)].filter(Boolean).join(" · ");
   showSaveSummaryMessage("正在读取这版存档…");
   let result;
   try {
@@ -756,10 +841,9 @@ function bindCanvas() {
   pane.title = "按住空格拖动，滚轮缩放";
 
   window.addEventListener("keydown", (e) => {
-    if (e.code !== "Space") return;
+    if (e.code !== "Space" || pane.hidden) return;
     const t = e.target;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable ||
-      t.closest?.("#saveSummary, #btnBossProgress, .app-dialog"))) return;
+    if (t?.closest?.("button, input, select, textarea, [contenteditable], .app-dialog, #dlg")) return;
     e.preventDefault();
     spaceDown = true;
     pane.classList.add("pan");
@@ -772,6 +856,7 @@ function bindCanvas() {
   });
 
   pane.addEventListener("mousedown", (e) => {
+    if (e.target.closest?.("button, label, input")) return;
     const wantPan = spaceDown || e.button === 1;
     if (!wantPan) return;
     e.preventDefault();
@@ -817,16 +902,10 @@ function bindCanvas() {
     fitView();
   };
   $("btnFit").addEventListener("mousedown", (e) => e.stopPropagation());
-  $("btnSide").addEventListener("mousedown", (e) => e.stopPropagation());
-  $("btnSide").onclick = (e) => {
-    e.stopPropagation();
-    showSide = !showSide;
-    syncSide();
-  };
-  pane.addEventListener("click", () => {
-    if (didPan || spaceDown || !selectedNode || !graphData) return;
+  pane.addEventListener("click", (e) => {
+    if (e.target.closest?.(".graph-tools, button") || didPan || spaceDown || !selectedNode || !graphData) return;
     selectedNode = null;
-    renderGraph(graphData);
+    renderWorkspace();
   });
   let fitMaxTimer = 0;
   let wasMax = false;
@@ -846,7 +925,6 @@ function bindCanvas() {
 }
 
 function renderGraph(g) {
-  loadSaveSummary(g);
   $("bossIndexStatus").hidden = !g.boss_indexing;
   const { nodes, colOf, rowOf, cols, colX } = getLayout(g);
   const current = onCurrentLine(g);
@@ -957,7 +1035,7 @@ function renderGraph(g) {
       e.stopPropagation();
       if (didPan || spaceDown) return;
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
-      renderGraph(g);
+      renderWorkspace();
     });
     el.addEventListener("dblclick", () => {
       if (didPan || spaceDown) return;
@@ -966,9 +1044,9 @@ function renderGraph(g) {
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       selectedNode = nodes.find((n) => n.id === el.dataset.id);
-      renderGraph(g);
+      renderWorkspace();
       const acts = [
-        { label: "切换到当前进度", run: restore },
+        { label: "恢复这份存档", run: restore },
         { label: "新建分支", run: newLine },
       ];
       if (!startIds.has(el.dataset.id)) {
@@ -1174,12 +1252,16 @@ async function removeItem(id, name) {
 
 async function restore() {
   if (!selectedId || !selectedNode) return;
-  if (!(await askYes("切换存档前请先退出游戏，否则可能失败或被游戏改回去。\n\n现在已经退出游戏了吗？"))) return;
+  const itemId = selectedId;
+  const node = selectedNode;
+  const time = formatTime(node.time);
+  if (!(await askYes(`将恢复到 ${time} 的备份。切换前请退出游戏。\n\n现在已经退出游戏了吗？`))) return;
   if (!(await askYes("会先把你现在的进度另外存一份，再切换到这一刻。如果开了 Steam 云存档，Steam 有可能又把存档改回去。"))) return;
   setBusy(true, "正在切换进度…");
   try {
-    const r = await api().restore(selectedId, selectedNode.id, true);
+    const r = await api().restore(itemId, node.id, true);
     if (!r.ok) return askOk(r.error);
+    if (selectedId === itemId) selectedNode = null;
     await loadGraph();
   } finally {
     setBusy(false);
@@ -1195,6 +1277,7 @@ async function newLine() {
   try {
     const r = await api().create_line(selectedId, selectedNode.id, name);
     if (!r.ok) return askOk(r.error);
+    selectedNode = null;
     await loadGraph();
   } finally {
     setBusy(false);
@@ -1296,15 +1379,31 @@ $("saveSummaryTabs").addEventListener("keydown", (e) => {
   activateSaveTab(visible[next].id);
   visible[next].focus();
 });
-$("btnBossProgress").onclick = (e) => {
-  e.stopPropagation();
-  $("saveSummary").open = true;
+$("btnRestoreSnapshot").onclick = restore;
+$("btnShowGraph").onclick = async () => {
+  if (!graphData) return;
+  showGraph = !showGraph;
+  if (showGraph) lastFitItem = null;
+  await loadGraph();
+};
+$("showAllHistory").onchange = () => {
+  historyLimit = 12;
+  if (graphData) renderHistory(graphData, currentPreview(graphData));
+};
+$("btnMoreHistory").onclick = () => {
+  if (!graphData) return;
+  const previouslyVisible = historyLimit;
+  historyLimit += 24;
+  renderHistory(graphData, currentPreview(graphData));
+  $("historyList").querySelectorAll("button")[previouslyVisible]?.focus();
+};
+$("btnBossProgress").onclick = async () => {
+  showGraph = false;
+  await loadGraph();
+  if ($("tabBossProgress").hidden) return;
   activateSaveTab("tabBossProgress");
   $("tabBossProgress").focus();
 };
-$("saveSummary").addEventListener("toggle", () => {
-  if (graphData && !$("graphWrap").hidden) fitView();
-});
 $("saveSummaryRetry").onclick = $("bossProgressRetry").onclick = $("achievementRetry").onclick = () => {
   if (!graphData) return;
   summaryKey = "";
@@ -1325,11 +1424,8 @@ $("btnSaveNow").onclick = async () => {
     const r = await api().save_now(selectedId);
     if (!r.ok) return askOk(r.error);
     if (r.skipped) return askOk("现在和上一版一样，没有新进度要存");
+    selectedNode = null;
     await loadGraph();
-    if (graphData && graphData.current_id) {
-      selectedNode = (graphData.nodes || []).find((n) => n.id === graphData.current_id) || null;
-      if (selectedNode) renderGraph(graphData);
-    }
   } finally {
     setBusy(false);
     $("btnSaveNow").blur();
@@ -1345,7 +1441,7 @@ $("showRemarks").checked = showRemarks;
 $("showRemarks").onchange = (e) => {
   showRemarks = e.target.checked;
   localStorage.setItem("gb-remarks", showRemarks ? "1" : "0");
-  if (graphData) renderGraph(graphData);
+  if (showGraph && graphData) renderGraph(graphData);
 };
 function syncEdgeButtons() {
   $("btnCurve").classList.toggle("on", curveEdges);
@@ -1355,7 +1451,7 @@ function setCurveEdges(on) {
   curveEdges = on;
   localStorage.setItem("gb-curve", on ? "1" : "0");
   syncEdgeButtons();
-  if (graphData) renderGraph(graphData);
+  if (showGraph && graphData) renderGraph(graphData);
 }
 $("btnCurve").onclick = () => setCurveEdges(true);
 $("btnStraight").onclick = () => setCurveEdges(false);
@@ -1368,13 +1464,86 @@ $("btnPauseAll").onclick = async () => {
 };
 function syncSide() {
   $("side").hidden = !showSide;
+  $("sideResize").hidden = !showSide;
   document.querySelector("main").classList.toggle("side-off", !showSide);
-  $("btnSide").textContent = showSide ? "‹" : "›";
+  $("btnSide").setAttribute("aria-expanded", String(showSide));
   $("btnSide").title = showSide ? "隐藏游戏列表" : "显示游戏列表";
   localStorage.setItem("gb-side", showSide ? "1" : "0");
   if (graphData && !$("graphWrap").hidden) fitView();
 }
+$("btnSide").onclick = () => {
+  showSide = !showSide;
+  syncSide();
+};
+
+function bindSideResize() {
+  const handle = $("sideResize");
+  const main = handle.closest("main");
+  const key = "gb-side-width";
+  const stored = Number(localStorage.getItem(key));
+  let preferred = Number.isFinite(stored) && stored > 0 ? stored : null;
+  let activePointer = null;
+  let offset = 0;
+  let current, minimum, maximum;
+
+  function applyWidth() {
+    const available = main.clientWidth;
+    maximum = Math.max(0, Math.min(420, Math.floor(available * 0.45), available - 260));
+    minimum = Math.min(140, maximum);
+    const fallback = parseInt(getComputedStyle(main).getPropertyValue("--side-default"), 10);
+    current = Math.min(maximum, Math.max(minimum, preferred ?? fallback));
+    main.style.setProperty("--side-width", `${current}px`);
+    handle.setAttribute("aria-valuemin", minimum);
+    handle.setAttribute("aria-valuemax", maximum);
+    handle.setAttribute("aria-valuenow", current);
+    handle.setAttribute("aria-valuetext", `${current} 像素`);
+  }
+
+  function finish() {
+    if (preferred === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, preferred);
+    if (graphData && !$("graphWrap").hidden) fitView();
+  }
+
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || activePointer !== null) return;
+    activePointer = e.pointerId;
+    offset = e.clientX - current;
+    handle.setPointerCapture(e.pointerId);
+    main.classList.add("side-resizing");
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (activePointer !== e.pointerId) return;
+    const width = Math.min(maximum, Math.max(minimum, Math.round(e.clientX - offset)));
+    if (width === current) return;
+    preferred = width;
+    applyWidth();
+  });
+  handle.addEventListener("lostpointercapture", (e) => {
+    if (activePointer !== e.pointerId) return;
+    activePointer = null;
+    main.classList.remove("side-resizing");
+    finish();
+  });
+  handle.addEventListener("keydown", (e) => {
+    const widths = {ArrowLeft: current - 16, ArrowRight: current + 16, Home: minimum, End: maximum};
+    if (!Object.hasOwn(widths, e.key)) return;
+    e.preventDefault();
+    preferred = Math.min(maximum, Math.max(minimum, widths[e.key]));
+    applyWidth();
+    finish();
+  });
+  handle.addEventListener("dblclick", () => {
+    preferred = null;
+    applyWidth();
+    finish();
+  });
+  window.addEventListener("resize", applyWidth);
+  applyWidth();
+}
+
 syncSide();
+bindSideResize();
 
 let graphRev = 0;
 async function pullGraphIfChanged() {
